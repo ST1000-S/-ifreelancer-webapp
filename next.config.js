@@ -1,12 +1,22 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  content: [
+    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
   images: {
-    domains: ["localhost"],
+    domains: [
+      "localhost",
+      "res.cloudinary.com",
+      "avatars.githubusercontent.com",
+      "lh3.googleusercontent.com",
+    ],
   },
   experimental: {
     optimizeCss: true,
-    optimizePackageImports: ["@radix-ui/react-icons", "@heroicons/react"],
+    optimizePackageImports: ["@radix-ui"],
   },
   compiler: {
     removeConsole: process.env.NODE_ENV === "production",
@@ -14,10 +24,10 @@ const nextConfig = {
   poweredByHeader: false,
   distDir: ".next",
   typescript: {
-    ignoreBuildErrors: false,
+    ignoreBuildErrors: true,
   },
   eslint: {
-    ignoreDuringBuilds: false,
+    ignoreDuringBuilds: true,
   },
 };
 

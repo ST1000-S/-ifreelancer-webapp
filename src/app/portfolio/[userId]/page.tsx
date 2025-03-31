@@ -1,11 +1,12 @@
-import { notFound } from "next/navigation";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import Image from "next/image";
+import { getInitials } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { notFound } from "next/navigation";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { getInitials } from "@/lib/utils";
 
 export default async function PublicPortfolioPage({
   params,
@@ -51,9 +52,12 @@ export default async function PublicPortfolioPage({
           <div className="flex items-center space-x-4">
             <Avatar className="h-20 w-20">
               {profile.user.image ? (
-                <AvatarImage
+                <Image
                   src={profile.user.image}
-                  alt={profile.user.name || ""}
+                  alt={profile.user.name || "User"}
+                  width={80}
+                  height={80}
+                  className="rounded-full"
                 />
               ) : (
                 <AvatarFallback>
@@ -125,10 +129,12 @@ export default async function PublicPortfolioPage({
                   className="bg-gray-800 rounded-lg overflow-hidden"
                 >
                   {project.imageUrl && (
-                    <div className="aspect-video">
-                      <img
+                    <div className="aspect-video rounded-md overflow-hidden mb-4">
+                      <Image
                         src={project.imageUrl}
                         alt={project.title}
+                        width={400}
+                        height={225}
                         className="w-full h-full object-cover"
                       />
                     </div>

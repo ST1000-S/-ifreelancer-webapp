@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Portfolio, PortfolioFormData } from "@/types/profile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -246,9 +247,11 @@ export default function PortfolioSection({ items }: PortfolioSectionProps) {
           >
             {item.imageUrl && (
               <div className="aspect-video rounded-md overflow-hidden mb-4">
-                <img
+                <Image
                   src={item.imageUrl}
                   alt={item.title}
+                  width={400}
+                  height={225}
                   className="w-full h-full object-cover"
                 />
               </div>

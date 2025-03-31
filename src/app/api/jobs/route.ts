@@ -5,12 +5,12 @@ import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 import {
-  Prisma,
   JobType,
   JobCategory,
   ExperienceLevel,
   JobStatus,
 } from "@prisma/client";
+import { JobFormData } from "@/types/job";
 
 // Define the enums locally since they're not exported by Prisma yet
 export enum JobDuration {
@@ -27,193 +27,141 @@ export enum JobAvailability {
 }
 
 const jobSchema = z.object({
-  title: z.string().min(10).max(100),
-  description: z.string().min(50).max(5000),
+  title: z.string().min(1),
+  description: z.string().min(1),
   type: z.nativeEnum(JobType),
-  budget: z.number().min(1),
-  skills: z.array(z.string()),
+  budget: z.number().min(0),
   category: z.nativeEnum(JobCategory),
   experienceLevel: z.nativeEnum(ExperienceLevel),
-  duration: z.number().optional(),
+  duration: z.string().optional(),
+  availability: z.boolean().optional(),
+  location: z.string().optional(),
+  skills: z.array(z.string()),
 });
 
+type WhereClause = {
+  OR?: Array<{ [key: string]: any }>;
+  type?: JobType;
+  category?: JobCategory;
+  experienceLevel?: ExperienceLevel;
+  budget?: { gte?: number; lte?: number };
+  skills?: { hasEvery: string[] };
+  status?: JobStatus;
+  creatorId?: string;
+  location?: string;
+  duration?: string;
+};
+
+type OrderByClause = {
+  budget?: "asc" | "desc";
+  createdAt?: "asc" | "desc";
+};
+
 // POST /api/jobs - Create a new job
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      logger.warn("Unauthorized job creation attempt");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    if (!session) {
+      return new Response("Unauthorized", { status: 401 });
     }
 
-    const data = await request.json();
-    const validatedData = jobSchema.parse(data);
+    const json = await req.json();
+    const body = jobSchema.parse(json);
 
     const job = await prisma.job.create({
       data: {
-        ...validatedData,
+        ...body,
         creatorId: session.user.id,
-      },
-      include: {
-        creator: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
-          },
-        },
-        applications: {
-          include: {
-            applicant: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                image: true,
-              },
-            },
-          },
-        },
+        status: JobStatus.OPEN,
       },
     });
 
-    logger.info("Job created", { jobId: job.id });
-
-    return NextResponse.json(job);
+    return Response.json(job);
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors }, { status: 400 });
-    }
-    logger.error(
-      "Error creating job",
-      new Error(error instanceof Error ? error.message : "Unknown error")
-    );
-    return NextResponse.json(
-      { error: "Failed to create job" },
-      { status: 500 }
-    );
+    console.error("Error creating job:", error);
+    return new Response("Internal Server Error", { status: 500 });
   }
 }
 
 // GET /api/jobs - Get jobs with optional filters
-export async function GET(request: Request) {
+export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = new URL(req.url);
     const query = searchParams.get("query");
-    const type = searchParams.get("type") as JobType | null;
-    const category = searchParams.get("category") as JobCategory | null;
+    const type = searchParams.get("type") as JobType;
+    const category = searchParams.get("category") as JobCategory;
     const experienceLevel = searchParams.get(
       "experienceLevel"
-    ) as ExperienceLevel | null;
+    ) as ExperienceLevel;
     const minBudget = searchParams.get("minBudget");
     const maxBudget = searchParams.get("maxBudget");
     const skills = searchParams.get("skills")?.split(",");
-    const status = (searchParams.get("status") || "OPEN") as JobStatus;
+    const status = searchParams.get("status") as JobStatus;
     const creatorId = searchParams.get("creatorId");
     const location = searchParams.get("location");
-    const duration = searchParams.get("duration")
-      ? parseInt(searchParams.get("duration")!)
-      : null;
-    const sortBy = searchParams.get("sortBy") || "recent";
+    const duration = searchParams.get("duration");
+    const sortBy = searchParams.get("sortBy");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
-    const skip = (page - 1) * limit;
 
-    const where: Prisma.JobWhereInput = {
-      ...(query && {
-        OR: [
-          { title: { contains: query, mode: "insensitive" } },
-          { description: { contains: query, mode: "insensitive" } },
-          { skills: { hasSome: [query] } },
-        ],
-      }),
-      ...(type && { type }),
-      ...(category && { category }),
-      ...(experienceLevel && { experienceLevel }),
-      ...(minBudget && { budget: { gte: parseFloat(minBudget) } }),
-      ...(maxBudget && { budget: { lte: parseFloat(maxBudget) } }),
-      ...(skills?.length && { skills: { hasSome: skills } }),
-      ...(location && { type: "REMOTE" }),
-      ...(duration && { duration }),
-      status,
-      ...(creatorId && { creatorId }),
-    };
+    const where: WhereClause = {};
 
-    let orderBy: Prisma.JobOrderByWithRelationInput = { createdAt: "desc" };
-
-    switch (sortBy) {
-      case "budget_high":
-        orderBy = { budget: "desc" };
-        break;
-      case "budget_low":
-        orderBy = { budget: "asc" };
-        break;
-      case "applications":
-        orderBy = { applications: { _count: "desc" } };
-        break;
-      case "rating":
-        orderBy = { createdAt: "desc" }; // Fallback to recent as rating is not supported
-        break;
-      default:
-        orderBy = { createdAt: "desc" };
+    if (query) {
+      where.OR = [
+        { title: { contains: query, mode: "insensitive" } },
+        { description: { contains: query, mode: "insensitive" } },
+      ];
     }
 
-    const [jobs, total] = await Promise.all([
-      prisma.job.findMany({
-        where,
-        include: {
-          creator: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-          applications: {
-            include: {
-              applicant: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true,
-                  image: true,
-                },
-              },
-            },
-          },
-          _count: {
-            select: {
-              applications: true,
-            },
+    if (type) where.type = type;
+    if (category) where.category = category;
+    if (experienceLevel) where.experienceLevel = experienceLevel;
+    if (minBudget) where.budget = { gte: parseFloat(minBudget) };
+    if (maxBudget)
+      where.budget = { ...where.budget, lte: parseFloat(maxBudget) };
+    if (skills?.length) where.skills = { hasEvery: skills };
+    if (status) where.status = status;
+    if (creatorId) where.creatorId = creatorId;
+    if (location) where.location = location;
+    if (duration) where.duration = duration;
+
+    const orderBy: OrderByClause = {};
+    if (sortBy === "budget_asc") orderBy.budget = "asc";
+    if (sortBy === "budget_desc") orderBy.budget = "desc";
+    if (sortBy === "latest") orderBy.createdAt = "desc";
+    if (sortBy === "oldest") orderBy.createdAt = "asc";
+
+    const jobs = await prisma.job.findMany({
+      where,
+      orderBy,
+      skip: (page - 1) * limit,
+      take: limit,
+      include: {
+        creator: {
+          select: {
+            name: true,
+            image: true,
           },
         },
-        orderBy,
-        skip,
-        take: limit,
-      }),
-      prisma.job.count({ where }),
-    ]);
-
-    return NextResponse.json({
-      jobs,
-      pagination: {
-        total,
-        pages: Math.ceil(total / limit),
-        page,
-        limit,
+        applications: {
+          select: {
+            id: true,
+          },
+        },
       },
     });
+
+    const total = await prisma.job.count({ where });
+
+    return Response.json({
+      jobs,
+      total,
+      pages: Math.ceil(total / limit),
+    });
   } catch (error) {
-    logger.error(
-      "Error fetching jobs",
-      new Error(error instanceof Error ? error.message : "Unknown error")
-    );
-    return NextResponse.json(
-      { error: "Failed to fetch jobs" },
-      { status: 500 }
-    );
+    console.error("Error fetching jobs:", error);
+    return new Response("Internal Server Error", { status: 500 });
   }
 }
 
