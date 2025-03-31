@@ -10,7 +10,8 @@
     "test": "jest src/lib/__tests__",
     "test:e2e": "playwright test tests/e2e",
     "test:all": "npm run test && npm run test:e2e",
-    "db:seed": "ts-node --project prisma/tsconfig.json prisma/seed.ts"
+    "db:seed": "ts-node --project prisma/tsconfig.json prisma/seed.ts",
+    "postinstall": "prisma generate"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
