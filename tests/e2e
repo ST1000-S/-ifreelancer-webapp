@@ -1,0 +1,259 @@
+import { test, expect } from "@playwright/test";
+
+interface Job {
+  id: string;
+  title: string;
+  description: string;
+  type: "REMOTE" | "ONSITE" | "HYBRID";
+  budget: string;
+  skills: string[];
+}
+
+const testUser = {
+  email: "test.api@example.com",
+  password: "password123",
+  role: "FREELANCER",
+};
+
+const jobData = {
+  title: "API Developer",
+  description: "Looking for an experienced API developer",
+  type: "REMOTE",
+  budget: "6000",
+  skills: ["Node.js", "REST", "GraphQL"],
+};
+
+test.describe("API Endpoints", () => {
+  let authToken: string;
+  let jobId: string;
+  let applicationId: string;
+
+  test.beforeAll(async ({ request }) => {
+    // Create test user
+    const signupResponse = await request.post("/api/auth/signup", {
+      data: testUser,
+    });
+    expect(signupResponse.ok()).toBeTruthy();
+
+    // Sign in and get auth token
+    const signinResponse = await request.post("/api/auth/signin", {
+      data: {
+        email: testUser.email,
+        password: testUser.password,
+      },
+    });
+    expect(signinResponse.ok()).toBeTruthy();
+    const responseData = await signinResponse.json();
+    authToken = responseData.token;
+  });
+
+  test.describe("Authentication Endpoints", () => {
+    test("should handle invalid credentials", async ({ request }) => {
+      const response = await request.post("/api/auth/signin", {
+        data: {
+          email: "invalid@example.com",
+          password: "wrongpassword",
+        },
+      });
+      expect(response.status()).toBe(401);
+      const data = await response.json();
+      expect(data.error).toBe("Invalid credentials");
+    });
+
+    test("should validate signup data", async ({ request }) => {
+      const response = await request.post("/api/auth/signup", {
+        data: {
+          email: "invalid-email",
+          password: "short",
+        },
+      });
+      expect(response.status()).toBe(400);
+      const data = await response.json();
+      expect(data.errors).toBeDefined();
+    });
+  });
+
+  test.describe("Jobs Endpoints", () => {
+    test("should create job", async ({ request }) => {
+      const response = await request.post("/api/jobs", {
+        data: jobData,
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+      expect(response.ok()).toBeTruthy();
+      const data = await response.json();
+      jobId = data.id;
+      expect(data.title).toBe(jobData.title);
+    });
+
+    test("should get jobs list", async ({ request }) => {
+      const response = await request.get("/api/jobs");
+      expect(response.ok()).toBeTruthy();
+      const data = await response.json();
+      expect(Array.isArray(data.jobs)).toBeTruthy();
+      expect(data.jobs.length).toBeGreaterThan(0);
+    });
+
+    test("should filter jobs", async ({ request }) => {
+      const response = await request.get("/api/jobs", {
+        params: {
+          type: "REMOTE",
+          minBudget: "5000",
+        },
+      });
+      expect(response.ok()).toBeTruthy();
+      const data = await response.json();
+      expect(data.jobs.every((job: Job) => job.type === "REMOTE")).toBeTruthy();
+    });
+
+    test("should update job", async ({ request }) => {
+      const response = await request.put(`/api/jobs/${jobId}`, {
+        data: {
+          ...jobData,
+          budget: "7000",
+        },
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+      expect(response.ok()).toBeTruthy();
+      const data = await response.json();
+      expect(data.budget).toBe("7000");
+    });
+  });
+
+  test.describe("Applications Endpoints", () => {
+    test("should submit application", async ({ request }) => {
+      const response = await request.post("/api/applications", {
+        data: {
+          jobId,
+          coverLetter: "I am interested in this position",
+          proposedRate: "50",
+          availability: "Immediate",
+        },
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+      expect(response.ok()).toBeTruthy();
+      const data = await response.json();
+      applicationId = data.id;
+      expect(data.status).toBe("PENDING");
+    });
+
+    test("should get applications", async ({ request }) => {
+      const response = await request.get("/api/applications", {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+      expect(response.ok()).toBeTruthy();
+      const data = await response.json();
+      expect(Array.isArray(data.applications)).toBeTruthy();
+    });
+
+    test("should update application status", async ({ request }) => {
+      const response = await request.put(`/api/applications/${applicationId}`, {
+        data: {
+          status: "ACCEPTED",
+        },
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+      expect(response.ok()).toBeTruthy();
+      const data = await response.json();
+      expect(data.status).toBe("ACCEPTED");
+    });
+  });
+
+  test.describe("Profile Endpoints", () => {
+    test("should update profile", async ({ request }) => {
+      const response = await request.put("/api/profile", {
+        data: {
+          fullName: "Test User",
+          title: "Senior Developer",
+          bio: "Experienced developer",
+          hourlyRate: "60",
+        },
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+      expect(response.ok()).toBeTruthy();
+      const data = await response.json();
+      expect(data.fullName).toBe("Test User");
+    });
+
+    test("should get public profile", async ({ request }) => {
+      const response = await request.get(`/api/profile/${testUser.email}`);
+      expect(response.ok()).toBeTruthy();
+      const data = await response.json();
+      expect(data.email).toBe(testUser.email);
+    });
+
+    test("should add education", async ({ request }) => {
+      const response = await request.post("/api/profile/education", {
+        data: {
+          institution: "Test University",
+          degree: "Computer Science",
+          graduationYear: "2020",
+        },
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+      expect(response.ok()).toBeTruthy();
+    });
+
+    test("should add certification", async ({ request }) => {
+      const response = await request.post("/api/profile/certifications", {
+        data: {
+          name: "AWS Certified",
+          issuer: "Amazon",
+          issueDate: "2023-01",
+          expiryDate: "2026-01",
+        },
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+      expect(response.ok()).toBeTruthy();
+    });
+  });
+
+  test.describe("Error Handling", () => {
+    test("should handle rate limiting", async ({ request }) => {
+      // Make multiple requests in quick succession
+      const promises = Array(10)
+        .fill(null)
+        .map(() => request.get("/api/jobs"));
+      const responses = await Promise.all(promises);
+      expect(responses.some((r) => r.status() === 429)).toBeTruthy();
+    });
+
+    test("should handle invalid token", async ({ request }) => {
+      const response = await request.get("/api/profile", {
+        headers: {
+          Authorization: "Bearer invalid-token",
+        },
+      });
+      expect(response.status()).toBe(401);
+    });
+
+    test("should validate request body", async ({ request }) => {
+      const response = await request.post("/api/jobs", {
+        data: {
+          // Missing required fields
+        },
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+      expect(response.status()).toBe(400);
+      const data = await response.json();
+      expect(data.errors).toBeDefined();
+    });
+  });
+});
