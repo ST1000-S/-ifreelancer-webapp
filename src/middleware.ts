@@ -9,6 +9,11 @@ export default withAuth(
       req.nextUrl.pathname.startsWith("/auth/signin") ||
       req.nextUrl.pathname.startsWith("/auth/signup");
 
+    // Allow public pages without redirection
+    if (!req.nextUrl.pathname.startsWith("/dashboard") && !isAuthPage) {
+      return null;
+    }
+
     if (isAuthPage) {
       if (isAuth) {
         return NextResponse.redirect(new URL("/dashboard", req.url));
@@ -16,7 +21,7 @@ export default withAuth(
       return null;
     }
 
-    if (!isAuth) {
+    if (!isAuth && req.nextUrl.pathname.startsWith("/dashboard")) {
       let from = req.nextUrl.pathname;
       if (req.nextUrl.search) {
         from += req.nextUrl.search;
@@ -29,13 +34,13 @@ export default withAuth(
 
     // Handle role-based access
     if (req.nextUrl.pathname.startsWith("/dashboard/my-jobs")) {
-      if (token.role !== "CLIENT") {
+      if (token?.role !== "CLIENT") {
         return NextResponse.redirect(new URL("/dashboard", req.url));
       }
     }
 
     if (req.nextUrl.pathname.startsWith("/dashboard/my-applications")) {
-      if (token.role !== "FREELANCER") {
+      if (token?.role !== "FREELANCER") {
         return NextResponse.redirect(new URL("/dashboard", req.url));
       }
     }
@@ -44,16 +49,11 @@ export default withAuth(
   },
   {
     callbacks: {
-      authorized: ({ token }) => !!token,
+      authorized: ({ token }) => true, // We'll handle authorization in the middleware
     },
   }
 );
 
 export const config = {
-  matcher: [
-    "/dashboard/:path*",
-    "/auth/signin",
-    "/auth/signup",
-    "/jobs/:path*",
-  ],
+  matcher: ["/dashboard/:path*", "/auth/signin", "/auth/signup"],
 };
