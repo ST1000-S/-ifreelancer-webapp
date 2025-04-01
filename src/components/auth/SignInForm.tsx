@@ -33,6 +33,7 @@ export default function SignInForm() {
 
     try {
       const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+      console.log("Attempting sign in with callback URL:", callbackUrl);
 
       const result = await signIn("credentials", {
         email: formData.email,
@@ -42,10 +43,12 @@ export default function SignInForm() {
       });
 
       if (!result) {
+        console.error("No result from signIn");
         throw new Error("Authentication failed - No response from server");
       }
 
       if (result.error) {
+        console.error("Sign in error:", result.error);
         logger.error("Sign in error", new Error(result.error));
         toast({
           title: "Error",
@@ -59,6 +62,7 @@ export default function SignInForm() {
       }
 
       if (result.url) {
+        console.log("Sign in successful, redirecting to:", result.url);
         toast({
           title: "Success",
           description: "Signed in successfully",
@@ -68,6 +72,7 @@ export default function SignInForm() {
         router.refresh();
       }
     } catch (error) {
+      console.error("Sign in error:", error);
       logger.error("Sign in error", error as Error);
       toast({
         title: "Error",

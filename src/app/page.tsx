@@ -13,11 +13,15 @@ export default function Home() {
   const router = useRouter();
 
   // Handle the Get Started button click
-  const handleGetStarted = () => {
-    if (session) {
-      router.push("/dashboard");
-    } else {
-      router.push("/auth/signin");
+  const handleGetStarted = async () => {
+    try {
+      if (session) {
+        router.push("/dashboard");
+      } else {
+        router.push("/auth/signin?callbackUrl=/dashboard");
+      }
+    } catch (error) {
+      console.error("Navigation error:", error);
     }
   };
 
