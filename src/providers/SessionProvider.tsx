@@ -10,8 +10,22 @@ interface SessionProviderProps {
 }
 
 export function SessionProvider({ children, session }: SessionProviderProps) {
+  // Ensure session is serializable
+  const safeSession = session
+    ? {
+        ...session,
+        user: {
+          id: session.user?.id,
+          name: session.user?.name || null,
+          email: session.user?.email || null,
+          image: session.user?.image || null,
+          role: session.user?.role || null,
+        },
+      }
+    : null;
+
   return (
-    <NextAuthSessionProvider session={session}>
+    <NextAuthSessionProvider session={safeSession}>
       {children}
     </NextAuthSessionProvider>
   );

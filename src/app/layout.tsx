@@ -30,10 +30,24 @@ export default async function RootLayout({
 }) {
   const session = await getServerSession(authOptions);
 
+  // Create a safe serializable session object
+  const safeSession = session
+    ? {
+        user: {
+          id: session.user?.id,
+          name: session.user?.name || null,
+          email: session.user?.email || null,
+          image: session.user?.image || null,
+          role: session.user?.role || null,
+        },
+        expires: session.expires,
+      }
+    : null;
+
   return (
     <html lang="en" className={`${inter.variable} font-sans`}>
       <body className={inter.className}>
-        <SessionProvider session={session}>
+        <SessionProvider session={safeSession}>
           <QueryProvider>
             <Navigation />
             <main className="min-h-screen bg-background">{children}</main>
