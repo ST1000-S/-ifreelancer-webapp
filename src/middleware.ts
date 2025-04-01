@@ -11,6 +11,7 @@ export async function middleware(request: NextRequest) {
     path === "/auth/signin" ||
     path === "/auth/signup" ||
     path === "/jobs" ||
+    path === "/profile" || // Make profile page public for visitors
     path.startsWith("/api/auth") ||
     (path.startsWith("/api/jobs") && !path.includes("/api/jobs/user"));
 
@@ -28,9 +29,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // If user is trying to access protected route without auth, redirect to signin
+  // Special handling for the dashboard - only require auth for dashboard
+  if (path.startsWith("/dashboard") && !token) {
+    // Store the original URL to redirect back after signin
+    const signinUrl = new URL("/auth/signin", request.url);
+    signinUrl.searchParams.set("callbackUrl", request.url);
+    return NextResponse.redirect(signinUrl);
+  }
+
+  // For other protected routes (like post-job), redirect to signin if not authenticated
   if (!isPublicPath && !token) {
-    return NextResponse.redirect(new URL("/auth/signin", request.url));
+    const signinUrl = new URL("/auth/signin", request.url);
+    signinUrl.searchParams.set("callbackUrl", request.url);
+    return NextResponse.redirect(signinUrl);
   }
 
   return NextResponse.next();
