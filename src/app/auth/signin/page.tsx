@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import SignInForm from "@/components/auth/SignInForm";
 import { TechBackground } from "@/components/ui/TechBackground";
 import { motion } from "framer-motion";
@@ -14,7 +15,9 @@ export default function SignInPage() {
           transition={{ duration: 0.5 }}
           className="w-full max-w-md"
         >
-          <SignInForm />
+          <Suspense fallback={<div>Loading...</div>}>
+            <SignInForm />
+          </Suspense>
         </motion.div>
       </div>
     </TechBackground>
