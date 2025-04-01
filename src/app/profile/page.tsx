@@ -53,16 +53,17 @@ interface UserProfile {
 }
 
 export default function ProfilePage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProfileData = async () => {
       try {
         // In a real app, fetch actual user profile data from API
         // For demo purposes, we're using mock data
-        setUserProfile({
+        const mockProfile: UserProfile = {
           name: session?.user?.name || "John Doe",
           email: session?.user?.email || "john@example.com",
           role: session?.user?.role || "freelancer",
@@ -161,18 +162,25 @@ export default function ProfilePage() {
               description: "Verify your identity and credentials",
             },
           ],
-        });
+        };
+
+        setUserProfile(mockProfile);
         setLoading(false);
       } catch (error) {
         logger.error("Error fetching profile data:", error as Error);
+        setError("Failed to load profile data. Please try again later.");
         setLoading(false);
       }
     };
 
-    if (session) {
+    if (status === "authenticated") {
       fetchProfileData();
+    } else if (status === "unauthenticated") {
+      // If user is not authenticated, stop loading and don't show profile
+      setLoading(false);
     }
-  }, [session]);
+    // Keep loading while status is "loading"
+  }, [session, status]);
 
   // Calculate profile completion percentage
   const calculateCompletionPercentage = () => {
@@ -192,21 +200,50 @@ export default function ProfilePage() {
   const handleRemoveSkill = (skillName: string) => {
     // In a real app, this would call an API to remove the skill
     if (confirm(`Are you sure you want to remove the skill: ${skillName}?`)) {
-      setUserProfile({
-        ...userProfile!,
-        skills: userProfile!.skills.filter((skill) => skill.name !== skillName),
-      });
+      if (userProfile) {
+        const updatedProfile = {
+          ...userProfile,
+          skills: userProfile.skills.filter(
+            (skill) => skill.name !== skillName
+          ),
+        };
+        setUserProfile(updatedProfile);
+      }
     }
   };
 
+  // Show loading state while session is being determined
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        Loading profile...
+        <div className="animate-pulse">Loading profile...</div>
       </div>
     );
   }
 
+  // Show login prompt if user is not authenticated
+  if (status === "unauthenticated") {
+    return (
+      <div className="container mx-auto py-8 px-4 text-center">
+        <h1 className="text-2xl font-bold mb-4">Profile Not Available</h1>
+        <p className="mb-4">Please sign in to view your profile.</p>
+        <Button asChild>
+          <a href="/auth/signin">Sign In</a>
+        </Button>
+      </div>
+    );
+  }
+
+  // Show error message if there was a problem
+  if (error) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-red-500">{error}</div>
+      </div>
+    );
+  }
+
+  // Show "not found" if profile couldn't be loaded
   if (!userProfile) {
     return (
       <div className="flex justify-center items-center min-h-screen">

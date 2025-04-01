@@ -1,61 +1,45 @@
-import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 
-export default withAuth(
-  function middleware(req) {
-    const token = req.nextauth.token;
-    const isAuth = !!token;
-    const isAuthPage =
-      req.nextUrl.pathname.startsWith("/auth/signin") ||
-      req.nextUrl.pathname.startsWith("/auth/signup");
+export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
 
-    // If on auth page and already authenticated, redirect to dashboard
-    if (isAuthPage && isAuth) {
-      return NextResponse.redirect(new URL("/dashboard", req.url));
-    }
+  // Define public paths that don't require authentication
+  const isPublicPath =
+    path === "/" ||
+    path === "/auth/signin" ||
+    path === "/auth/signup" ||
+    path === "/jobs" ||
+    path.startsWith("/api/auth") ||
+    (path.startsWith("/api/jobs") && !path.includes("/api/jobs/user"));
 
-    // If trying to access protected routes without auth, redirect to signin
-    if (!isAuth && req.nextUrl.pathname.startsWith("/dashboard")) {
-      const from = req.nextUrl.pathname + (req.nextUrl.search || "");
-      return NextResponse.redirect(
-        new URL(`/auth/signin?from=${encodeURIComponent(from)}`, req.url)
-      );
-    }
+  // Check for authentication token
+  const token = await getToken({
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET,
+  });
 
-    // Handle role-based access for protected routes
-    if (isAuth && req.nextUrl.pathname.startsWith("/dashboard")) {
-      if (
-        req.nextUrl.pathname.startsWith("/dashboard/my-jobs") &&
-        token.role !== "CLIENT"
-      ) {
-        return NextResponse.redirect(new URL("/dashboard", req.url));
-      }
+  // Redirect logic
+  const isAuthPath = path.startsWith("/auth");
 
-      if (
-        req.nextUrl.pathname.startsWith("/dashboard/my-applications") &&
-        token.role !== "FREELANCER"
-      ) {
-        return NextResponse.redirect(new URL("/dashboard", req.url));
-      }
-    }
-
-    return null;
-  },
-  {
-    callbacks: {
-      authorized: ({ token }) => {
-        // Allow access to auth pages without a token
-        // For other routes, require a valid token
-        return true;
-      },
-    },
-    pages: {
-      signIn: "/auth/signin",
-      error: "/auth/error",
-    },
+  // If user is on auth page but already authenticated, redirect to dashboard
+  if (isAuthPath && token) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
-);
 
+  // If user is trying to access protected route without auth, redirect to signin
+  if (!isPublicPath && !token) {
+    return NextResponse.redirect(new URL("/auth/signin", request.url));
+  }
+
+  return NextResponse.next();
+}
+
+// Configure which paths the middleware should run on
 export const config = {
-  matcher: ["/dashboard/:path*", "/auth/signin", "/auth/signup"],
+  matcher: [
+    // Apply to all paths except static files, api routes needed for auth
+    "/((?!_next/static|_next/image|favicon.ico|images|.*\\.png$).*)",
+  ],
 };
