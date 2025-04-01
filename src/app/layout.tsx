@@ -33,14 +33,14 @@ export default async function RootLayout({
   // Create a minimal serializable session object
   const safeSession = session
     ? {
+        expires: session.expires,
         user: {
           id: session.user?.id || "",
           email: session.user?.email || "",
           name: session.user?.name || null,
           image: session.user?.image || null,
-          role: session.user?.role || "USER",
+          role: session.user?.role || "FREELANCER",
         },
-        expires: session.expires,
       }
     : null;
 

@@ -255,27 +255,26 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.email = user.email;
         token.role = user.role;
-        token.name = user.name;
-        token.picture = user.image;
+        token.name = user.name ?? null;
+        token.image = user.image ?? null;
       }
       return token;
     },
     async session({ session, token }) {
-      if (token) {
-        session.user = {
+      return {
+        ...session,
+        user: {
           id: token.id as string,
           email: token.email as string,
           role: token.role as UserRole,
           name: token.name as string | null,
-          image: token.picture as string | null,
-        };
-      }
-      return session;
+          image: token.image as string | null,
+        },
+      };
     },
   },
   pages: {
     signIn: "/auth/signin",
-    signOut: "/auth/signout",
     error: "/auth/error",
   },
   debug: process.env.NODE_ENV === "development",

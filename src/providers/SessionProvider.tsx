@@ -3,6 +3,7 @@
 import { SessionProvider as NextAuthSessionProvider } from "next-auth/react";
 import { Session } from "next-auth";
 import { ReactNode } from "react";
+import { UserRole } from "@prisma/client";
 
 interface SessionProviderProps {
   children: ReactNode;
@@ -13,13 +14,13 @@ export function SessionProvider({ children, session }: SessionProviderProps) {
   // Ensure session is serializable
   const safeSession = session
     ? {
-        ...session,
+        expires: session.expires,
         user: {
-          id: session.user?.id,
+          id: session.user?.id || "",
+          email: session.user?.email || "",
           name: session.user?.name || null,
-          email: session.user?.email || null,
           image: session.user?.image || null,
-          role: session.user?.role || null,
+          role: (session.user?.role as UserRole) || "FREELANCER",
         },
       }
     : null;
