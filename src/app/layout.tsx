@@ -5,7 +5,7 @@ import { SessionProvider } from "@/providers/SessionProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { Navigation } from "@/components/Navigation";
 import { Toaster } from "@/components/ui/toaster";
-import "@/styles/globals.css";
+import "../styles/globals.css";
 
 export const metadata: Metadata = {
   title: "iFreelancer",
