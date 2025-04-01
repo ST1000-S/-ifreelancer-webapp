@@ -67,7 +67,12 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ message: "User created successfully" });
   } catch (error) {
-    logger.error("Error during signup", error as Error);
+    logger.error("Error during signup", {
+      error: error as Error,
+      stack: (error as Error).stack,
+      name: (error as Error).name,
+      message: (error as Error).message,
+    });
     return NextResponse.json(
       { error: "Something went wrong" },
       { status: 500 }
