@@ -11,7 +11,6 @@ export async function middleware(request: NextRequest) {
     path === "/auth/signin" ||
     path === "/auth/signup" ||
     path === "/jobs" ||
-    path === "/profile" || // Make profile page public for visitors
     path.startsWith("/api/auth") ||
     (path.startsWith("/api/jobs") && !path.includes("/api/jobs/user"));
 
@@ -27,6 +26,13 @@ export async function middleware(request: NextRequest) {
   // If user is on auth page but already authenticated, redirect to dashboard
   if (isAuthPath && token) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // For the profile page, redirect to signin if not authenticated
+  if (path === "/profile" && !token) {
+    const signinUrl = new URL("/auth/signin", request.url);
+    signinUrl.searchParams.set("callbackUrl", request.url);
+    return NextResponse.redirect(signinUrl);
   }
 
   // Special handling for the dashboard - only require auth for dashboard

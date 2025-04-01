@@ -11,7 +11,7 @@ export default function Home() {
   const { data: session, status } = useSession();
 
   // Determine the destination for the "Get Started" button based on auth status
-  const getStartedLink = session ? "/dashboard" : "/profile";
+  const getStartedLink = session ? "/dashboard" : "/auth/signin";
 
   return (
     <div className="relative min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white overflow-hidden">
