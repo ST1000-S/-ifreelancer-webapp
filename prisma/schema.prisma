@@ -40,12 +40,14 @@ model Session {
 model User {
   id            String           @id @default(cuid())
   name          String?
-  email         String?         @unique
+  email         String          @unique
   emailVerified DateTime?
   image         String?
-  password      String?
+  password      String
   role          UserRole        @default(FREELANCER)
   rating        Float?
+  resetToken    String?
+  resetTokenExpires DateTime?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   profile       Profile?
@@ -196,9 +198,12 @@ model Job {
   title         String
   description   String
   budget        Float
+  budgetType    String          @default("FIXED")
   type          JobType
   status        JobStatus        @default(OPEN)
   category      JobCategory
+  experienceLevel String         @default("BEGINNER")
+  availability  String          @default("FULL_TIME")
   location      String?
   duration      Int?             // Duration in days
   skills        String[]
@@ -210,6 +215,12 @@ model Job {
   reviews       Review[]         @relation("JobReviews")
 
   @@index([creatorId])
+  @@index([status])
+  @@index([type])
+  @@index([category])
+  @@index([skills])
+  @@index([createdAt])
+  @@index([budget])
 }
 
 model JobApplication {

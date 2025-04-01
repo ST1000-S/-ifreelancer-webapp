@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthForm } from "@/components/AuthForm";
+import Link from "next/link";
+import { TechBackground } from "@/components/ui/TechBackground";
+import { TechCard } from "@/components/ui/TechCard";
+import { motion } from "framer-motion";
 
 type SignUpData = {
   email: string;
@@ -36,20 +40,46 @@ export default function SignUp() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4">
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-2">Create an Account</h1>
-        <p className="text-gray-600">Join iFreelancer to start your journey</p>
+    <TechBackground>
+      <div className="flex items-center justify-center min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-md flex flex-col items-center"
+        >
+          <motion.div
+            className="text-center mb-6"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            <h1 className="text-4xl font-bold text-blue-400 mb-2">
+              iFreelancer
+            </h1>
+            <h2 className="text-3xl font-extrabold text-white">
+              Create an Account
+            </h2>
+            <p className="mt-2 text-center text-sm text-gray-300">
+              Join iFreelancer and start your journey
+            </p>
+          </motion.div>
+
+          <TechCard className="w-full">
+            <AuthForm mode="signup" onSubmit={handleSubmit} error={error} />
+          </TechCard>
+
+          <p className="mt-6 text-center text-sm text-gray-300">
+            Already have an account?{" "}
+            <Link
+              href="/auth/signin"
+              className="font-medium text-blue-400 hover:text-blue-300 underline underline-offset-2"
+            >
+              Sign in
+            </Link>
+          </p>
+        </motion.div>
       </div>
-
-      <AuthForm mode="signup" onSubmit={handleSubmit} error={error} />
-
-      <p className="mt-4 text-gray-600">
-        Already have an account?{" "}
-        <a href="/auth/signin" className="text-primary hover:underline">
-          Sign in
-        </a>
-      </p>
-    </div>
+    </TechBackground>
   );
 }

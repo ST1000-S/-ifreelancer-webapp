@@ -1,0 +1,4 @@
+-- Add new columns with default values
+ALTER TABLE "Job" ADD COLUMN "budgetType" TEXT NOT NULL DEFAULT 'FIXED';
+ALTER TABLE "Job" ADD COLUMN "experienceLevel" TEXT NOT NULL DEFAULT 'BEGINNER';
+ALTER TABLE "Job" ADD COLUMN "availability" TEXT NOT NULL DEFAULT 'FULL_TIME'; 

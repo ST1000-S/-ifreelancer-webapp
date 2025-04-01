@@ -1,11 +1,22 @@
-import { Metadata } from "next";
-import SignInForm from "@/components/auth/SignInForm";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Sign In - iFreelancer",
-  description: "Sign in to your iFreelancer account",
-};
+import SignInForm from "@/components/auth/SignInForm";
+import { TechBackground } from "@/components/ui/TechBackground";
+import { motion } from "framer-motion";
 
 export default function SignInPage() {
-  return <SignInForm />;
+  return (
+    <TechBackground>
+      <div className="flex items-center justify-center min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-md"
+        >
+          <SignInForm />
+        </motion.div>
+      </div>
+    </TechBackground>
+  );
 }

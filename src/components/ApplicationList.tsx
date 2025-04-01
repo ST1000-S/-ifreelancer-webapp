@@ -10,14 +10,40 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
-import { Job, JobApplication } from "@prisma/client";
 
-interface ApplicationWithJob extends JobApplication {
-  job: Job;
+// Define our own interfaces for serialized data
+interface SerializedJob {
+  id: string;
+  title: string;
+  description: string;
+  budget: number;
+  budgetType: string;
+  type: string;
+  status: string;
+  category: string;
+  experienceLevel: string;
+  availability: string;
+  location?: string;
+  duration?: string;
+  skills: string[];
+  createdAt: string; // ISO string
+  updatedAt: string; // ISO string
+  creatorId: string;
+}
+
+interface SerializedApplication {
+  id: string;
+  jobId: string;
+  applicantId: string;
+  coverLetter: string | null;
+  status: string;
+  createdAt: string; // ISO string
+  updatedAt: string; // ISO string
+  job: SerializedJob;
 }
 
 interface ApplicationListProps {
-  applications: ApplicationWithJob[];
+  applications: SerializedApplication[];
 }
 
 export function ApplicationList({ applications }: ApplicationListProps) {

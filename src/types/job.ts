@@ -1,8 +1,7 @@
-import {
+import type {
   JobType,
   JobStatus,
   ApplicationStatus,
-  ExperienceLevel,
   JobCategory,
 } from "@prisma/client";
 
@@ -16,24 +15,19 @@ export interface Job {
   id: string;
   title: string;
   description: string;
-  type: JobType;
   budget: number;
-  budgetType: "FIXED" | "HOURLY";
-  skills: string[];
+  budgetType: string;
+  type: JobType;
   status: JobStatus;
   category: JobCategory;
-  experienceLevel: ExperienceLevel;
-  duration:
-    | "LESS_THAN_1_MONTH"
-    | "ONE_TO_THREE_MONTHS"
-    | "THREE_TO_SIX_MONTHS"
-    | "MORE_THAN_6_MONTHS";
-  availability: "FULL_TIME" | "PART_TIME" | "FLEXIBLE";
+  experienceLevel: string;
+  availability: string;
   location?: string;
+  duration?: string;
+  skills: string[];
   createdAt: Date;
   updatedAt: Date;
   creatorId: string;
-  applications?: JobApplication[];
 }
 
 export interface JobApplication {
@@ -41,14 +35,9 @@ export interface JobApplication {
   jobId: string;
   applicantId: string;
   coverLetter: string;
-  proposedRate: number;
-  availability: string;
-  startDate: Date;
   status: ApplicationStatus;
-  attachments: string[];
   createdAt: Date;
   updatedAt: Date;
-  job?: Job;
 }
 
 export type JobFormData = Omit<
@@ -62,7 +51,12 @@ export type JobApplicationFormData = Omit<
 >;
 
 export interface JobWithCreator extends Job {
-  creator: Pick<User, "id" | "name" | "image">;
+  creator: {
+    id: string;
+    name: string;
+    email: string;
+    image?: string;
+  };
   _count: {
     applications: number;
   };

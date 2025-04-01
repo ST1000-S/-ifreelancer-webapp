@@ -235,8 +235,8 @@ export const authOptions: NextAuthOptions = {
             id: user.id,
             email: user.email,
             role: user.role,
-            name: user.name ?? null,
-            image: user.image ?? null,
+            name: user.name ?? "",
+            image: user.image ?? "",
           };
         } catch (error) {
           logger.error("Authentication error", error as Error);
@@ -245,37 +245,37 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-  },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
         token.email = user.email;
         token.role = user.role;
-        token.name = user.name ?? null;
-        token.image = user.image ?? null;
+        token.name = user.name;
+        token.image = user.image;
       }
       return token;
     },
     async session({ session, token }) {
-      return {
-        ...session,
-        user: {
+      if (token) {
+        session.user = {
           id: token.id as string,
           email: token.email as string,
           role: token.role as UserRole,
-          name: token.name as string | null,
-          image: token.image as string | null,
-        },
-      };
+          name: token.name as string,
+          image: token.image as string,
+        };
+      }
+      return session;
     },
   },
   pages: {
     signIn: "/auth/signin",
     error: "/auth/error",
   },
-  debug: process.env.NODE_ENV === "development",
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+  secret: process.env.NEXTAUTH_SECRET,
 };

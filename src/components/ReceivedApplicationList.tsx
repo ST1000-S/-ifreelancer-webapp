@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/components/ui/use-toast";
-import { JobApplication, Job, User, Profile } from "@prisma/client";
 import {
   Table,
   TableBody,
@@ -13,15 +12,65 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-interface ExtendedJobApplication extends JobApplication {
-  job: Job;
-  applicant: User & {
-    profile: Profile | null;
-  };
+// Define serialized types for client-side use
+interface SerializedJob {
+  id: string;
+  title: string;
+  description: string;
+  budget: number;
+  budgetType: string;
+  type: string;
+  status: string;
+  category: string;
+  experienceLevel: string;
+  availability: string;
+  location?: string;
+  duration?: string;
+  skills: string[];
+  createdAt: string;
+  updatedAt: string;
+  creatorId: string;
+}
+
+interface SerializedProfile {
+  id: string;
+  userId: string;
+  title: string | null;
+  bio?: string | null;
+  description?: string | null;
+  hourlyRate: number | null;
+  skills: string[];
+  education?: unknown[] | null;
+  experience?: unknown[] | null;
+  availability: boolean;
+  location?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface SerializedUser {
+  id: string;
+  name: string | null;
+  email: string | null;
+  image: string | null;
+  profile: SerializedProfile | null;
+}
+
+interface SerializedApplication {
+  id: string;
+  jobId: string;
+  applicantId: string;
+  coverLetter: string | null;
+  proposedRate?: number | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  job: SerializedJob;
+  applicant: SerializedUser;
 }
 
 interface ReceivedApplicationListProps {
-  initialApplications: ExtendedJobApplication[];
+  initialApplications: SerializedApplication[];
 }
 
 export default function ReceivedApplicationList({
@@ -29,7 +78,7 @@ export default function ReceivedApplicationList({
 }: ReceivedApplicationListProps) {
   const { toast } = useToast();
   const [applications, setApplications] =
-    useState<ExtendedJobApplication[]>(initialApplications);
+    useState<SerializedApplication[]>(initialApplications);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -59,7 +108,7 @@ export default function ReceivedApplicationList({
 
   const handleStatusChange = async (
     applicationId: string,
-    newStatus: JobApplication["status"]
+    newStatus: string
   ) => {
     setUpdatingId(applicationId);
 
@@ -140,7 +189,7 @@ export default function ReceivedApplicationList({
                   </p>
                 </div>
               </TableCell>
-              <TableCell>${application.proposedRate}/hr</TableCell>
+              <TableCell>${application.proposedRate || 0}/hr</TableCell>
               <TableCell>
                 {application.applicant.profile?.title || "Not specified"}
               </TableCell>
@@ -155,10 +204,7 @@ export default function ReceivedApplicationList({
                   aria-label="Update application status"
                   value={application.status}
                   onChange={(e) =>
-                    handleStatusChange(
-                      application.id,
-                      e.target.value as JobApplication["status"]
-                    )
+                    handleStatusChange(application.id, e.target.value)
                   }
                   className="border rounded p-1"
                   disabled={updatingId === application.id}

@@ -44,7 +44,31 @@ interface JobCardProps {
 }
 
 export function JobCard({ job }: JobCardProps) {
-  const skills = job.skills || [];
+  // Ensure all data has proper defaults to prevent rendering errors
+  const {
+    title = "",
+    description = "",
+    budget = 0,
+    budgetType = "FIXED",
+    type = "REMOTE",
+    status = "OPEN",
+    category = "",
+    experienceLevel = "",
+    availability = "",
+    createdAt = new Date().toISOString(),
+    skills = [],
+    _count = { applications: 0 },
+    creator = { name: "Anonymous", email: "", id: "" },
+  } = job || {};
+
+  // Safely format the date with a fallback
+  const formattedDate = (() => {
+    try {
+      return format(new Date(createdAt), "MMM d, yyyy");
+    } catch (error) {
+      return "Unknown date";
+    }
+  })();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -66,36 +90,35 @@ export function JobCard({ job }: JobCardProps) {
       <CardHeader>
         <div className="flex justify-between items-start">
           <div>
-            <h3 className="text-xl font-semibold text-white">{job.title}</h3>
+            <h3 className="text-xl font-semibold text-white">{title}</h3>
             <p className="text-sm text-gray-400">
-              Posted by {job.creator.name} •{" "}
-              {format(new Date(job.createdAt), "MMM d, yyyy")}
+              Posted by {creator.name} • {formattedDate}
             </p>
           </div>
           <div className="flex gap-2">
-            <Badge variant={job.type === "REMOTE" ? "default" : "secondary"}>
-              {job.type}
+            <Badge variant={type === "REMOTE" ? "default" : "secondary"}>
+              {type}
             </Badge>
-            <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
+            <Badge className={getStatusColor(status)}>{status}</Badge>
           </div>
         </div>
       </CardHeader>
 
       <CardContent>
-        <p className="text-gray-300 line-clamp-3">{job.description}</p>
+        <p className="text-gray-300 line-clamp-3">{description}</p>
 
         <div className="mt-4 space-y-4">
-          <div className="flex items-center gap-4 text-sm text-gray-400">
+          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
             <div className="flex items-center gap-1">
               <Clock className="h-4 w-4" />
               <span className="font-medium text-white">
-                ${job.budget}
-                {job.budgetType === "HOURLY" ? "/hr" : ""}
+                ${budget}
+                {budgetType === "HOURLY" ? "/hr" : ""}
               </span>
             </div>
             <div className="flex items-center gap-1">
               <Briefcase className="h-4 w-4" />
-              <span>{job.availability}</span>
+              <span>{availability}</span>
             </div>
             {job.duration && (
               <div className="flex items-center gap-1">
@@ -111,18 +134,18 @@ export function JobCard({ job }: JobCardProps) {
 
           <div className="flex items-center gap-2 text-sm text-gray-400">
             <span className="font-medium text-white">
-              {job._count.applications} applications
+              {_count.applications} applications
             </span>
             <span>•</span>
-            <span>{job.category}</span>
+            <span>{category}</span>
             <span>•</span>
-            <span>{job.experienceLevel}</span>
+            <span>{experienceLevel}</span>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {skills.map((skill) => (
+            {skills.map((skill, index) => (
               <Badge
-                key={skill}
+                key={`${skill}-${index}`}
                 variant="outline"
                 className="border-blue-500/50 text-blue-400"
               >

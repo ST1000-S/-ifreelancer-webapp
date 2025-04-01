@@ -10,6 +10,11 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface JobSearchSectionProps {
   initialJobs: JobWithCreator[];
+  pagination?: {
+    currentPage: number;
+    totalPages: number;
+    totalJobs: number;
+  };
 }
 
 interface PaginationInfo {
@@ -18,7 +23,10 @@ interface PaginationInfo {
   totalJobs: number;
 }
 
-export function JobSearchSection({ initialJobs }: JobSearchSectionProps) {
+export function JobSearchSection({
+  initialJobs,
+  pagination,
+}: JobSearchSectionProps) {
   const [jobs, setJobs] = useState<JobWithCreator[]>(initialJobs);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,11 +43,13 @@ export function JobSearchSection({ initialJobs }: JobSearchSectionProps) {
     location: "",
     duration: "",
   });
-  const [pagination, setPagination] = useState<PaginationInfo>({
-    currentPage: 1,
-    totalPages: 1,
-    totalJobs: initialJobs.length,
-  });
+  const [paginationState, setPaginationState] = useState<PaginationInfo>(
+    pagination || {
+      currentPage: 1,
+      totalPages: 1,
+      totalJobs: initialJobs.length,
+    }
+  );
 
   const handleFilterChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -50,7 +60,7 @@ export function JobSearchSection({ initialJobs }: JobSearchSectionProps) {
       [name]: value,
     }));
     // Reset to first page when filters change
-    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+    setPaginationState((prev) => ({ ...prev, currentPage: 1 }));
   };
 
   const validateFilters = () => {
@@ -89,7 +99,7 @@ export function JobSearchSection({ initialJobs }: JobSearchSectionProps) {
       if (filters.sortBy) queryParams.append("sortBy", filters.sortBy);
       if (filters.location) queryParams.append("location", filters.location);
       if (filters.duration) queryParams.append("duration", filters.duration);
-      queryParams.append("page", pagination.currentPage.toString());
+      queryParams.append("page", paginationState.currentPage.toString());
       queryParams.append("limit", "10");
 
       const response = await fetch(`/api/jobs?${queryParams.toString()}`);
@@ -99,7 +109,7 @@ export function JobSearchSection({ initialJobs }: JobSearchSectionProps) {
 
       const data = await response.json();
       setJobs(data.jobs);
-      setPagination({
+      setPaginationState({
         currentPage: data.currentPage,
         totalPages: data.totalPages,
         totalJobs: data.total,
@@ -114,7 +124,25 @@ export function JobSearchSection({ initialJobs }: JobSearchSectionProps) {
   };
 
   const handlePageChange = (newPage: number) => {
-    setPagination((prev) => ({ ...prev, currentPage: newPage }));
+    if (
+      filters.query ||
+      filters.type !== "all" ||
+      filters.category !== "all" ||
+      filters.minBudget ||
+      filters.maxBudget ||
+      filters.skills ||
+      filters.experienceLevel !== "all" ||
+      filters.location ||
+      filters.duration
+    ) {
+      // If there are active filters, use client-side pagination via API
+      setPaginationState((prev) => ({ ...prev, currentPage: newPage }));
+      // Then call the search API with the new page
+      handleSearch();
+    } else {
+      // For basic pagination without filters, use server-side navigation
+      window.location.href = `/jobs?page=${newPage}`;
+    }
   };
 
   return (
@@ -269,22 +297,24 @@ export function JobSearchSection({ initialJobs }: JobSearchSectionProps) {
         </div>
 
         {/* Pagination */}
-        {pagination.totalPages > 1 && (
+        {paginationState.totalPages > 1 && (
           <div className="flex justify-center items-center gap-2 mt-8">
             <Button
               variant="outline"
-              onClick={() => handlePageChange(pagination.currentPage - 1)}
-              disabled={pagination.currentPage === 1}
+              onClick={() => handlePageChange(paginationState.currentPage - 1)}
+              disabled={paginationState.currentPage === 1}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <span className="text-sm text-gray-400">
-              Page {pagination.currentPage} of {pagination.totalPages}
+              Page {paginationState.currentPage} of {paginationState.totalPages}
             </span>
             <Button
               variant="outline"
-              onClick={() => handlePageChange(pagination.currentPage + 1)}
-              disabled={pagination.currentPage === pagination.totalPages}
+              onClick={() => handlePageChange(paginationState.currentPage + 1)}
+              disabled={
+                paginationState.currentPage === paginationState.totalPages
+              }
             >
               <ChevronRight className="h-4 w-4" />
             </Button>

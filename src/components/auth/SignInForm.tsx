@@ -3,20 +3,23 @@
 import Link from "next/link";
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { logger } from "@/lib/logger";
+import { TechCard } from "@/components/ui/TechCard";
+import { motion } from "framer-motion";
 
 interface FormData {
   email: string;
   password: string;
 }
 
-export default function SignInForm(): JSX.Element {
+export default function SignInForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
@@ -29,14 +32,16 @@ export default function SignInForm(): JSX.Element {
     setIsLoading(true);
 
     try {
+      const callbackUrl = searchParams.get("from") || "/dashboard";
       const result = await signIn("credentials", {
         email: formData.email,
         password: formData.password,
         redirect: false,
+        callbackUrl,
       });
 
       if (!result) {
-        throw new Error("Authentication failed");
+        throw new Error("Authentication failed - No response from server");
       }
 
       if (result.error) {
@@ -46,24 +51,26 @@ export default function SignInForm(): JSX.Element {
           description:
             result.error === "CredentialsSignin"
               ? "Invalid email or password"
-              : "An error occurred during sign in",
+              : result.error,
           variant: "destructive",
         });
         return;
       }
 
-      toast({
-        title: "Success",
-        description: "Signed in successfully",
-      });
+      if (result.url) {
+        toast({
+          title: "Success",
+          description: "Signed in successfully",
+        });
 
-      router.push("/dashboard");
-      router.refresh();
+        router.push(result.url);
+        router.refresh();
+      }
     } catch (error) {
       logger.error("Sign in error", error as Error);
       toast({
         title: "Error",
-        description: "Something went wrong. Please try again.",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -72,98 +79,120 @@ export default function SignInForm(): JSX.Element {
   };
 
   return (
-    <div className="container relative flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-2 lg:px-0">
-      <div className="relative hidden h-full flex-col bg-muted p-10 text-white lg:flex dark:border-r">
-        <div className="absolute inset-0 bg-zinc-900" />
-        <div className="relative z-20 flex items-center text-lg font-medium">
-          <Link href="/" aria-label="Go to homepage">
-            iFreelancer
+    <div className="w-full">
+      <motion.div
+        className="text-center mb-6"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.1 }}
+      >
+        <h1 className="text-4xl font-bold text-blue-400 mb-2">iFreelancer</h1>
+        <h2 className="text-3xl font-extrabold text-white">Welcome Back</h2>
+        <p className="mt-2 text-center text-sm text-gray-300">
+          Or{" "}
+          <Link
+            href="/auth/signup"
+            className="font-medium text-blue-400 hover:text-blue-300 underline underline-offset-2"
+          >
+            create a new account
           </Link>
-        </div>
-        <div className="relative z-20 mt-auto">
-          <blockquote className="space-y-2">
-            <p className="text-lg">
-              &ldquo;iFreelancer has transformed how I find work. The
-              platform&apos;s focus on local talent and secure payments makes it
-              my go-to choice for freelancing.&rdquo;
-            </p>
-            <footer className="text-sm">Sofia Davis</footer>
-          </blockquote>
-        </div>
-      </div>
-      <div className="lg:p-8">
-        <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
-          <div className="flex flex-col space-y-2 text-center">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Welcome back
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Enter your email to sign in to your account
-            </p>
+        </p>
+      </motion.div>
+
+      <TechCard className="py-8 px-6">
+        <form className="space-y-6" onSubmit={handleSubmit}>
+          <div>
+            <Label htmlFor="email" className="text-gray-700 font-medium">
+              Email address
+            </Label>
+            <div className="mt-1">
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={formData.email}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
+                className="block w-full rounded-md border border-gray-300/70 px-3 py-2 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary bg-white/70"
+              />
+            </div>
           </div>
-          <div className="grid gap-6">
-            <form onSubmit={handleSubmit} data-testid="signin-form">
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="email" className="sr-only">
-                    Email
-                  </Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="Email"
-                    aria-label="Email"
-                    value={formData.email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
-                    }
-                    required
-                    data-testid="email-input"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="password" className="sr-only">
-                    Password
-                  </Label>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    autoComplete="current-password"
-                    placeholder="Password"
-                    aria-label="Password"
-                    value={formData.password}
-                    onChange={(e) =>
-                      setFormData({ ...formData, password: e.target.value })
-                    }
-                    required
-                    data-testid="password-input"
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={isLoading}
-                  data-testid="submit-button"
+
+          <div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password" className="text-gray-700 font-medium">
+                Password
+              </Label>
+              <div className="text-sm">
+                <Link
+                  href="/auth/reset-password"
+                  className="font-medium text-primary hover:text-primary/80 underline underline-offset-2"
                 >
-                  {isLoading ? "Signing in..." : "Sign In"}
-                </Button>
+                  Forgot your password?
+                </Link>
               </div>
-            </form>
+            </div>
+            <div className="mt-1">
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={formData.password}
+                onChange={(e) =>
+                  setFormData({ ...formData, password: e.target.value })
+                }
+                className="block w-full rounded-md border border-gray-300/70 px-3 py-2 shadow-sm focus:border-primary focus:ring-1 focus:ring-primary bg-white/70"
+              />
+            </div>
           </div>
-          <p className="text-center text-sm text-muted-foreground">
-            <Link
-              href="/auth/signup"
-              className="hover:text-brand underline underline-offset-4"
-              data-testid="signup-link"
+
+          <div>
+            <Button
+              type="submit"
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+              disabled={isLoading}
             >
-              Don&apos;t have an account? Sign up
+              {isLoading ? (
+                <div className="flex items-center">
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  <span>Signing in...</span>
+                </div>
+              ) : (
+                "Sign in"
+              )}
+            </Button>
+          </div>
+        </form>
+
+        <div className="mt-6">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300/50"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white/80 text-gray-500">
+                New to iFreelancer?
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <Link href="/auth/signup">
+              <Button
+                variant="outline"
+                className="w-full flex justify-center py-2 px-4 border border-gray-300/50 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white/70 hover:bg-gray-50"
+              >
+                Create an account
+              </Button>
             </Link>
-          </p>
+          </div>
         </div>
-      </div>
+      </TechCard>
     </div>
   );
 }

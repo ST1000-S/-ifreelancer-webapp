@@ -4,13 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
-import {
-  JobType,
-  JobCategory,
-  ExperienceLevel,
-  JobStatus,
-} from "@prisma/client";
-import { JobFormData } from "@/types/job";
+import { JobType, JobCategory, JobStatus, Prisma } from "@prisma/client";
 
 // Define the enums locally since they're not exported by Prisma yet
 export enum JobDuration {
@@ -32,30 +26,13 @@ const jobSchema = z.object({
   type: z.nativeEnum(JobType),
   budget: z.number().min(0),
   category: z.nativeEnum(JobCategory),
-  experienceLevel: z.nativeEnum(ExperienceLevel),
-  duration: z.string().optional(),
-  availability: z.boolean().optional(),
   location: z.string().optional(),
+  duration: z.number().optional(),
   skills: z.array(z.string()),
 });
 
-type WhereClause = {
-  OR?: Array<{ [key: string]: any }>;
-  type?: JobType;
-  category?: JobCategory;
-  experienceLevel?: ExperienceLevel;
-  budget?: { gte?: number; lte?: number };
-  skills?: { hasEvery: string[] };
-  status?: JobStatus;
-  creatorId?: string;
-  location?: string;
-  duration?: string;
-};
-
-type OrderByClause = {
-  budget?: "asc" | "desc";
-  createdAt?: "asc" | "desc";
-};
+type WhereClause = Prisma.JobWhereInput;
+type OrderByClause = Prisma.JobOrderByWithRelationInput;
 
 // POST /api/jobs - Create a new job
 export async function POST(req: Request) {
@@ -71,7 +48,14 @@ export async function POST(req: Request) {
 
     const job = await prisma.job.create({
       data: {
-        ...body,
+        title: body.title,
+        description: body.description,
+        type: body.type,
+        budget: body.budget,
+        category: body.category,
+        location: body.location,
+        duration: body.duration,
+        skills: body.skills,
         creatorId: session.user.id,
         status: JobStatus.OPEN,
       },
@@ -79,7 +63,12 @@ export async function POST(req: Request) {
 
     return Response.json(job);
   } catch (error) {
-    console.error("Error creating job:", error);
+    logger.error("Error creating job:", {
+      error: error as Error,
+      stack: (error as Error).stack,
+      name: (error as Error).name,
+      message: (error as Error).message,
+    });
     return new Response("Internal Server Error", { status: 500 });
   }
 }
@@ -91,22 +80,23 @@ export async function GET(req: Request) {
     const query = searchParams.get("query");
     const type = searchParams.get("type") as JobType;
     const category = searchParams.get("category") as JobCategory;
-    const experienceLevel = searchParams.get(
-      "experienceLevel"
-    ) as ExperienceLevel;
     const minBudget = searchParams.get("minBudget");
     const maxBudget = searchParams.get("maxBudget");
-    const skills = searchParams.get("skills")?.split(",");
-    const status = searchParams.get("status") as JobStatus;
+    const skills = searchParams.get("skills")?.split(",").filter(Boolean);
+    const status = (searchParams.get("status") as JobStatus) || JobStatus.OPEN;
     const creatorId = searchParams.get("creatorId");
     const location = searchParams.get("location");
     const duration = searchParams.get("duration");
-    const sortBy = searchParams.get("sortBy");
+    const sortBy = searchParams.get("sortBy") || "latest";
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
 
-    const where: WhereClause = {};
+    // Create where clause for efficient query
+    const where: WhereClause = {
+      status, // Always filter by status (indexed)
+    };
 
+    // Apply text search only if needed (potentially expensive)
     if (query) {
       where.OR = [
         { title: { contains: query, mode: "insensitive" } },
@@ -116,51 +106,186 @@ export async function GET(req: Request) {
 
     if (type) where.type = type;
     if (category) where.category = category;
-    if (experienceLevel) where.experienceLevel = experienceLevel;
-    if (minBudget) where.budget = { gte: parseFloat(minBudget) };
-    if (maxBudget)
-      where.budget = { ...where.budget, lte: parseFloat(maxBudget) };
-    if (skills?.length) where.skills = { hasEvery: skills };
-    if (status) where.status = status;
+
+    // Apply budget range filters using our index
+    if (minBudget || maxBudget) {
+      where.budget = {};
+      if (minBudget) where.budget.gte = parseFloat(minBudget);
+      if (maxBudget) where.budget.lte = parseFloat(maxBudget);
+    }
+
+    // Apply skills filter (indexed)
+    if (skills?.length) {
+      // Use hasEvery for exact matches
+      where.skills = { hasEvery: skills };
+    }
+
     if (creatorId) where.creatorId = creatorId;
-    if (location) where.location = location;
-    if (duration) where.duration = duration;
+    if (location) where.location = { contains: location, mode: "insensitive" };
+    if (duration) where.duration = { lte: parseInt(duration) };
 
+    // Set up sorting based on indexed fields
     const orderBy: OrderByClause = {};
-    if (sortBy === "budget_asc") orderBy.budget = "asc";
-    if (sortBy === "budget_desc") orderBy.budget = "desc";
-    if (sortBy === "latest") orderBy.createdAt = "desc";
-    if (sortBy === "oldest") orderBy.createdAt = "asc";
+    if (sortBy === "budget_high" || sortBy === "budget_desc")
+      orderBy.budget = "desc";
+    else if (sortBy === "budget_low" || sortBy === "budget_asc")
+      orderBy.budget = "asc";
+    else if (sortBy === "latest" || sortBy === "recent")
+      orderBy.createdAt = "desc";
+    else if (sortBy === "oldest") orderBy.createdAt = "asc";
+    else if (sortBy === "applications") {
+      // Use proper sorting by application count
+      // Note: This can't be done directly with OrderBy, so we'll use a workaround
+      // by adding a subquery later
+    }
 
-    const jobs = await prisma.job.findMany({
+    // Execute our paginated query for jobs with limited, specific includes
+    const jobsQuery = prisma.job.findMany({
       where,
       orderBy,
       skip: (page - 1) * limit,
       take: limit,
-      include: {
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        budget: true,
+        budgetType: true,
+        type: true,
+        status: true,
+        category: true,
+        experienceLevel: true,
+        availability: true,
+        location: true,
+        duration: true,
+        skills: true,
+        createdAt: true,
+        updatedAt: true,
+        creatorId: true,
         creator: {
           select: {
+            id: true,
             name: true,
+            email: true,
             image: true,
           },
         },
-        applications: {
+        _count: {
           select: {
-            id: true,
+            applications: true,
           },
         },
       },
     });
 
+    // If sorting by application count, we need a special query
+    let jobs;
+    if (sortBy === "applications") {
+      // Get jobs with applications count
+      jobs = await prisma.job.findMany({
+        where,
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          budget: true,
+          budgetType: true,
+          type: true,
+          status: true,
+          category: true,
+          experienceLevel: true,
+          availability: true,
+          location: true,
+          duration: true,
+          skills: true,
+          createdAt: true,
+          updatedAt: true,
+          creatorId: true,
+          creator: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
+          },
+          _count: {
+            select: {
+              applications: true,
+            },
+          },
+        },
+      });
+
+      // Sort manually by application count
+      jobs.sort((a, b) => b._count.applications - a._count.applications);
+
+      // Apply pagination manually
+      jobs = jobs.slice((page - 1) * limit, page * limit);
+    } else {
+      // For regular sorting, use the query as is
+      jobs = await jobsQuery;
+    }
+
+    // Get total count for accurate pagination
     const total = await prisma.job.count({ where });
+    const totalPages = Math.ceil(total / limit);
+
+    // Serialize the job data to ensure it can be safely passed through the API
+    const serializedJobs = jobs.map((job) => ({
+      id: job.id,
+      title: job.title,
+      description: job.description,
+      budget: job.budget,
+      budgetType: job.budgetType,
+      type: job.type,
+      status: job.status,
+      category: job.category,
+      experienceLevel: job.experienceLevel,
+      availability: job.availability,
+      location: job.location || undefined,
+      duration: job.duration ? String(job.duration) : undefined,
+      skills: Array.isArray(job.skills) ? job.skills : [],
+      createdAt:
+        job.createdAt instanceof Date
+          ? job.createdAt.toISOString()
+          : job.createdAt,
+      updatedAt:
+        job.updatedAt instanceof Date
+          ? job.updatedAt.toISOString()
+          : job.updatedAt,
+      creatorId: job.creatorId,
+      creator: {
+        id: job.creator.id,
+        name: job.creator.name || "",
+        email: job.creator.email,
+        image: job.creator.image || undefined,
+      },
+      _count: {
+        applications: job._count.applications,
+      },
+    }));
+
+    logger.info("Jobs fetched successfully", {
+      totalJobs: total,
+      page,
+      limit,
+      filters: Object.keys(where).length - 1, // Subtract the default status filter
+    });
 
     return Response.json({
-      jobs,
+      jobs: serializedJobs,
       total,
-      pages: Math.ceil(total / limit),
+      totalPages,
+      currentPage: page,
     });
   } catch (error) {
-    console.error("Error fetching jobs:", error);
+    logger.error("Error fetching jobs:", {
+      error: error as Error,
+      stack: (error as Error).stack,
+      name: (error as Error).name,
+      message: (error as Error).message,
+    });
     return new Response("Internal Server Error", { status: 500 });
   }
 }

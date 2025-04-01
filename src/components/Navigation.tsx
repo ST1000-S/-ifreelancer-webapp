@@ -1,17 +1,27 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useMemo } from "react";
 import { Disclosure, Menu, Transition } from "@headlessui/react";
 import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const navigation = [
+// Common navigation items for all users
+const commonNavigation = [
   { name: "Home", href: "/" },
   { name: "Find Jobs", href: "/jobs" },
+];
+
+// Role-specific navigation items
+const clientNavigation = [
   { name: "Post a Job", href: "/dashboard/post-job" },
   { name: "My Jobs", href: "/dashboard/my-jobs" },
+];
+
+const freelancerNavigation = [
+  { name: "Advanced Search", href: "/jobs/search" },
+  { name: "My Applications", href: "/dashboard/my-applications" },
 ];
 
 function classNames(...classes: string[]) {
@@ -21,6 +31,21 @@ function classNames(...classes: string[]) {
 export function Navigation() {
   const { data: session } = useSession();
   const pathname = usePathname();
+
+  // Dynamically build navigation based on user role
+  const navigation = useMemo(() => {
+    const baseNav = [...commonNavigation];
+
+    if (!session?.user) {
+      return baseNav;
+    }
+
+    if (session.user.role === "CLIENT") {
+      return [...baseNav, ...clientNavigation];
+    }
+
+    return [...baseNav, ...freelancerNavigation];
+  }, [session]);
 
   return (
     <Disclosure as="nav" className="bg-white shadow">
