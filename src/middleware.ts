@@ -10,9 +10,13 @@ export async function middleware(request: NextRequest) {
     path === "/" ||
     path === "/auth/signin" ||
     path === "/auth/signup" ||
+    path === "/auth/error" ||
     path === "/jobs" ||
     path.startsWith("/api/auth") ||
     (path.startsWith("/api/jobs") && !path.includes("/api/jobs/user"));
+
+  // Check if path is an auth page
+  const isAuthPage = path.startsWith("/auth");
 
   // Check for authentication token
   const token = await getToken({
@@ -20,33 +24,26 @@ export async function middleware(request: NextRequest) {
     secret: process.env.NEXTAUTH_SECRET,
   });
 
-  // Redirect logic
-  const isAuthPath = path.startsWith("/auth");
-
-  // If user is on auth page but already authenticated, redirect to dashboard
-  if (isAuthPath && token) {
+  // If user is already authenticated and tries to access an auth page, redirect to dashboard
+  if (isAuthPage && token) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // For the profile page, redirect to signin if not authenticated
+  // For /profile specifically, redirect to signin if not authenticated
   if (path === "/profile" && !token) {
-    const signinUrl = new URL("/auth/signin", request.url);
-    signinUrl.searchParams.set("callbackUrl", request.url);
-    return NextResponse.redirect(signinUrl);
+    return NextResponse.redirect(new URL("/auth/signin", request.url));
   }
 
-  // Special handling for the dashboard - only require auth for dashboard
-  if (path.startsWith("/dashboard") && !token) {
+  // For dashboard and other protected routes, redirect to signin
+  if (!isPublicPath && !token) {
     // Store the original URL to redirect back after signin
     const signinUrl = new URL("/auth/signin", request.url);
-    signinUrl.searchParams.set("callbackUrl", request.url);
-    return NextResponse.redirect(signinUrl);
-  }
 
-  // For other protected routes (like post-job), redirect to signin if not authenticated
-  if (!isPublicPath && !token) {
-    const signinUrl = new URL("/auth/signin", request.url);
-    signinUrl.searchParams.set("callbackUrl", request.url);
+    // Set the callback URL
+    if (path !== "/api/auth/signin") {
+      signinUrl.searchParams.set("callbackUrl", request.url);
+    }
+
     return NextResponse.redirect(signinUrl);
   }
 

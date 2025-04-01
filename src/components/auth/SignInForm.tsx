@@ -32,7 +32,8 @@ export default function SignInForm() {
     setIsLoading(true);
 
     try {
-      const callbackUrl = searchParams.get("from") || "/dashboard";
+      const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+
       const result = await signIn("credentials", {
         email: formData.email,
         password: formData.password,

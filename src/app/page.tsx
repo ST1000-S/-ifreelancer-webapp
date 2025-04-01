@@ -6,12 +6,20 @@ import { Button } from "@/components/ui/button";
 import { HeroLamp, HeroContent } from "@/components/ui/HeroLamp";
 import { motion } from "framer-motion";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
+  const router = useRouter();
 
-  // Determine the destination for the "Get Started" button based on auth status
-  const getStartedLink = session ? "/dashboard" : "/auth/signin";
+  // Handle the Get Started button click
+  const handleGetStarted = () => {
+    if (session) {
+      router.push("/dashboard");
+    } else {
+      router.push("/auth/signin");
+    }
+  };
 
   return (
     <div className="relative min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white overflow-hidden">
@@ -44,14 +52,13 @@ export default function Home() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.7 }}
           >
-            <Link href={getStartedLink}>
-              <Button
-                size="lg"
-                className="min-w-[200px] bg-blue-600 hover:bg-blue-700 text-lg h-14"
-              >
-                Get Started
-              </Button>
-            </Link>
+            <Button
+              onClick={handleGetStarted}
+              size="lg"
+              className="min-w-[200px] bg-blue-600 hover:bg-blue-700 text-lg h-14"
+            >
+              Get Started
+            </Button>
             <Link href="/jobs">
               <Button
                 size="lg"
