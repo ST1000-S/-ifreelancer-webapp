@@ -5,17 +5,21 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
+const prismaClientSingleton = () => {
+  return new PrismaClient({
     log:
       process.env.NODE_ENV === "development"
         ? ["query", "error", "warn"]
         : ["error"],
     errorFormat: "pretty",
   });
+};
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+export const prisma = globalForPrisma.prisma ?? prismaClientSingleton();
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+}
 
 // Handle cleanup
 process.on("beforeExit", async () => {
@@ -26,42 +30,64 @@ process.on("beforeExit", async () => {
 // Handle errors and reconnection
 prisma.$use(async (params, next) => {
   const startTime = Date.now();
-  try {
-    const result = await next(params);
-    const duration = Date.now() - startTime;
+  let retries = 0;
+  const maxRetries = 3;
 
-    // Log slow queries (over 1 second)
-    if (duration > 1000) {
-      logger.warn("Slow database query detected", {
+  while (retries < maxRetries) {
+    try {
+      const result = await next(params);
+      const duration = Date.now() - startTime;
+
+      // Log slow queries (over 1 second)
+      if (duration > 1000) {
+        logger.warn("Slow database query detected", {
+          model: params.model,
+          action: params.action,
+          duration: `${duration}ms`,
+        });
+      }
+
+      return result;
+    } catch (error) {
+      retries++;
+      logger.error("Database operation failed", error as Error, {
         model: params.model,
         action: params.action,
-        duration: `${duration}ms`,
+        args: params.args,
+        attempt: retries,
       });
-    }
 
-    return result;
-  } catch (error) {
-    logger.error("Database operation failed", error as Error, {
-      model: params.model,
-      action: params.action,
-      args: params.args,
-    });
+      // Attempt to reconnect only for connection errors
+      if (
+        error instanceof Error &&
+        (error.message.includes("connection") ||
+          error.message.includes("timeout") ||
+          error.message.includes("pool"))
+      ) {
+        try {
+          await prisma.$disconnect();
+          await new Promise((resolve) => setTimeout(resolve, 1000 * retries)); // Exponential backoff
+          await prisma.$connect();
+          logger.info("Successfully reconnected to database", {
+            attempt: retries,
+          });
+          continue; // Retry the operation
+        } catch (reconnectError) {
+          logger.error(
+            "Failed to reconnect to database",
+            reconnectError as Error,
+            {
+              attempt: retries,
+            }
+          );
+        }
+      }
 
-    // Attempt to reconnect only for connection errors
-    if (error instanceof Error && error.message.includes("connection")) {
-      try {
-        await prisma.$disconnect();
-        await prisma.$connect();
-        logger.info("Successfully reconnected to database");
-      } catch (reconnectError) {
-        logger.error(
-          "Failed to reconnect to database",
-          reconnectError as Error
-        );
+      // If we've exhausted retries or it's not a connection error, throw
+      if (retries === maxRetries) {
+        throw error;
       }
     }
-
-    throw error;
   }
 });
 

@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { logger } from "@/lib/logger";
 
 interface FormData {
   email: string;
@@ -34,10 +35,18 @@ export default function SignInForm(): JSX.Element {
         redirect: false,
       });
 
-      if (result?.error) {
+      if (!result) {
+        throw new Error("Authentication failed");
+      }
+
+      if (result.error) {
+        logger.error("Sign in error", new Error(result.error));
         toast({
           title: "Error",
-          description: "Invalid email or password",
+          description:
+            result.error === "CredentialsSignin"
+              ? "Invalid email or password"
+              : "An error occurred during sign in",
           variant: "destructive",
         });
         return;
@@ -51,6 +60,7 @@ export default function SignInForm(): JSX.Element {
       router.push("/dashboard");
       router.refresh();
     } catch (error) {
+      logger.error("Sign in error", error as Error);
       toast({
         title: "Error",
         description: "Something went wrong. Please try again.",
