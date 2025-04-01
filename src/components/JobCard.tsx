@@ -10,15 +10,41 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { JobWithCreator } from "@/types/job";
 import { Clock, MapPin, Briefcase, Calendar } from "lucide-react";
 
+// Define the interface directly in this file to avoid serialization issues
 interface JobCardProps {
-  job: JobWithCreator;
+  job: {
+    id: string;
+    title: string;
+    description: string;
+    budget: number;
+    budgetType: string;
+    type: string;
+    status: string;
+    category: string;
+    experienceLevel: string;
+    availability: string;
+    location?: string;
+    duration?: string;
+    skills: string[];
+    createdAt: string; // ISO string format for dates
+    updatedAt: string; // ISO string format for dates
+    creatorId: string;
+    creator: {
+      id: string;
+      name: string;
+      email: string;
+      image?: string;
+    };
+    _count: {
+      applications: number;
+    };
+  };
 }
 
 export function JobCard({ job }: JobCardProps) {
-  const skills = job.skills;
+  const skills = job.skills || [];
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -71,10 +97,12 @@ export function JobCard({ job }: JobCardProps) {
               <Briefcase className="h-4 w-4" />
               <span>{job.availability}</span>
             </div>
-            <div className="flex items-center gap-1">
-              <Calendar className="h-4 w-4" />
-              <span>{job.duration}</span>
-            </div>
+            {job.duration && (
+              <div className="flex items-center gap-1">
+                <Calendar className="h-4 w-4" />
+                <span>{job.duration}</span>
+              </div>
+            )}
             <div className="flex items-center gap-1">
               <MapPin className="h-4 w-4" />
               <span>{job.location || "Remote"}</span>
