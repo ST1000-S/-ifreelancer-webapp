@@ -15,13 +15,14 @@ export default function Home() {
   // Handle the Get Started button click
   const handleGetStarted = async () => {
     try {
-      if (session) {
-        router.push("/dashboard");
+      if (session?.user) {
+        await router.push("/dashboard");
       } else {
-        router.push("/auth/signin?callbackUrl=/dashboard");
+        await router.push("/auth/signin?callbackUrl=/dashboard");
       }
     } catch (error) {
       console.error("Navigation error:", error);
+      await router.push("/auth/error?error=Configuration");
     }
   };
 

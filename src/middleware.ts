@@ -18,28 +18,36 @@ export async function middleware(request: NextRequest) {
     path.includes(".") ||
     path === "/favicon.ico";
 
-  // Check if path is an auth page
-  const isAuthPage = path.startsWith("/auth");
+  try {
+    // Check for authentication token
+    const token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
 
-  // Check for authentication token
-  const token = await getToken({
-    req: request,
-    secret: process.env.NEXTAUTH_SECRET,
-  });
+    // Check if path is an auth page
+    const isAuthPage = path.startsWith("/auth");
 
-  // If user is already authenticated and tries to access an auth page, redirect to dashboard
-  if (token && isAuthPage) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    // If user is already authenticated and tries to access an auth page, redirect to dashboard
+    if (token && isAuthPage) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+
+    // For protected routes, redirect to signin if not authenticated
+    if (!isPublicPath && !token) {
+      const signinUrl = new URL("/auth/signin", request.url);
+      signinUrl.searchParams.set("callbackUrl", request.url);
+      return NextResponse.redirect(signinUrl);
+    }
+
+    return NextResponse.next();
+  } catch (error) {
+    console.error("Middleware error:", error);
+    // If there's an error, redirect to the error page
+    const errorUrl = new URL("/auth/error", request.url);
+    errorUrl.searchParams.set("error", "Configuration");
+    return NextResponse.redirect(errorUrl);
   }
-
-  // For protected routes, redirect to signin if not authenticated
-  if (!isPublicPath && !token) {
-    const signinUrl = new URL("/auth/signin", request.url);
-    signinUrl.searchParams.set("callbackUrl", request.url);
-    return NextResponse.redirect(signinUrl);
-  }
-
-  return NextResponse.next();
 }
 
 // Configure which paths the middleware should run on
