@@ -9,38 +9,32 @@ export default withAuth(
       req.nextUrl.pathname.startsWith("/auth/signin") ||
       req.nextUrl.pathname.startsWith("/auth/signup");
 
-    // Allow public pages without redirection
-    if (!req.nextUrl.pathname.startsWith("/dashboard") && !isAuthPage) {
-      return null;
+    // If on auth page and already authenticated, redirect to dashboard
+    if (isAuthPage && isAuth) {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
     }
 
-    if (isAuthPage) {
-      if (isAuth) {
-        return NextResponse.redirect(new URL("/dashboard", req.url));
-      }
-      return null;
-    }
-
+    // If trying to access protected routes without auth, redirect to signin
     if (!isAuth && req.nextUrl.pathname.startsWith("/dashboard")) {
-      let from = req.nextUrl.pathname;
-      if (req.nextUrl.search) {
-        from += req.nextUrl.search;
-      }
-
+      const from = req.nextUrl.pathname + (req.nextUrl.search || "");
       return NextResponse.redirect(
         new URL(`/auth/signin?from=${encodeURIComponent(from)}`, req.url)
       );
     }
 
-    // Handle role-based access
-    if (req.nextUrl.pathname.startsWith("/dashboard/my-jobs")) {
-      if (token?.role !== "CLIENT") {
+    // Handle role-based access for protected routes
+    if (isAuth && req.nextUrl.pathname.startsWith("/dashboard")) {
+      if (
+        req.nextUrl.pathname.startsWith("/dashboard/my-jobs") &&
+        token.role !== "CLIENT"
+      ) {
         return NextResponse.redirect(new URL("/dashboard", req.url));
       }
-    }
 
-    if (req.nextUrl.pathname.startsWith("/dashboard/my-applications")) {
-      if (token?.role !== "FREELANCER") {
+      if (
+        req.nextUrl.pathname.startsWith("/dashboard/my-applications") &&
+        token.role !== "FREELANCER"
+      ) {
         return NextResponse.redirect(new URL("/dashboard", req.url));
       }
     }
@@ -49,7 +43,15 @@ export default withAuth(
   },
   {
     callbacks: {
-      authorized: ({ token }) => true, // We'll handle authorization in the middleware
+      authorized: ({ token }) => {
+        // Allow access to auth pages without a token
+        // For other routes, require a valid token
+        return true;
+      },
+    },
+    pages: {
+      signIn: "/auth/signin",
+      error: "/auth/error",
     },
   }
 );
