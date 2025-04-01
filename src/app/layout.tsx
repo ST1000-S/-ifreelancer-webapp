@@ -30,15 +30,15 @@ export default async function RootLayout({
 }) {
   const session = await getServerSession(authOptions);
 
-  // Create a safe serializable session object
+  // Create a minimal serializable session object
   const safeSession = session
     ? {
         user: {
-          id: session.user?.id,
+          id: session.user?.id || "",
+          email: session.user?.email || "",
           name: session.user?.name || null,
-          email: session.user?.email || null,
           image: session.user?.image || null,
-          role: session.user?.role || null,
+          role: session.user?.role || "USER",
         },
         expires: session.expires,
       }

@@ -1,24 +1,18 @@
-import type { NextAuthOptions, DefaultSession } from "next-auth";
+import type { NextAuthOptions } from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./prisma";
 import { logger } from "./logger";
 import bcrypt from "bcryptjs";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, UserRole } from "@prisma/client";
 import CredentialsProvider from "next-auth/providers/credentials";
 import type { Adapter } from "next-auth/adapters";
-
-export enum UserRole {
-  ADMIN = "ADMIN",
-  CLIENT = "CLIENT",
-  FREELANCER = "FREELANCER",
-}
 
 export interface User {
   id: string;
   email: string;
   role: UserRole;
-  name?: string | null;
-  image?: string | null;
+  name: string | null;
+  image: string | null;
 }
 
 export interface Credentials {
@@ -34,11 +28,19 @@ export interface NewUser {
 
 declare module "next-auth" {
   interface Session {
-    user: {
-      id: string;
-      email: string;
-      role: UserRole;
-    } & DefaultSession["user"];
+    user: User;
+  }
+
+  interface JWT {
+    id: string;
+    role: UserRole;
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    id: string;
+    role: UserRole;
   }
 }
 
@@ -67,18 +69,28 @@ export async function authorize(credentials: Credentials): Promise<User> {
 
   const user = await prisma.user.findUnique({
     where: { email: credentials.email },
+    select: {
+      id: true,
+      email: true,
+      password: true,
+      role: true,
+      name: true,
+      image: true,
+    },
   });
 
-  if (!user) {
-    const error = new Error("User not found");
-    logger.warn(error.message, { email: credentials.email });
+  if (!user || !user.email || !user.password) {
+    const error = new Error("Invalid credentials");
+    logger.warn("User not found or missing required fields", {
+      email: credentials.email,
+    });
     throw error;
   }
 
   const isValid = await bcrypt.compare(credentials.password, user.password);
   if (!isValid) {
     const error = new Error("Invalid credentials");
-    logger.warn(error.message, { email: credentials.email });
+    logger.warn("Invalid password", { email: credentials.email });
     throw error;
   }
 
@@ -86,15 +98,31 @@ export async function authorize(credentials: Credentials): Promise<User> {
   return {
     id: user.id,
     email: user.email,
-    role: user.role as UserRole,
+    role: user.role,
     name: user.name,
     image: user.image,
   };
 }
 
 export async function createUser(newUser: NewUser): Promise<User> {
+  if (!newUser.email || !newUser.password) {
+    const error = new Error("Email and password are required");
+    logger.warn(error.message);
+    throw error;
+  }
+
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(newUser.email)) {
+    const error = new Error("Invalid email format");
+    logger.warn(error.message, { email: newUser.email });
+    throw error;
+  }
+
   if (!isStrongPassword(newUser.password)) {
-    const error = new Error("Password does not meet security requirements");
+    const error = new Error(
+      "Password must be at least 8 characters long and contain uppercase, lowercase, numbers, and special characters"
+    );
     logger.warn(error.message, { email: newUser.email });
     throw error;
   }
@@ -119,13 +147,24 @@ export async function createUser(newUser: NewUser): Promise<User> {
 
     const user = await prisma.user.create({
       data: userData,
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        name: true,
+        image: true,
+      },
     });
+
+    if (!user.email) {
+      throw new Error("Failed to create user: email is required");
+    }
 
     logger.info("New user created successfully", { userId: user.id });
     return {
       id: user.id,
       email: user.email,
-      role: user.role as UserRole,
+      role: user.role,
       name: user.name,
       image: user.image,
     };
@@ -156,12 +195,51 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null;
-        }
         try {
-          return await authorize(credentials);
+          if (!credentials?.email || !credentials?.password) {
+            logger.warn("Missing credentials");
+            return null;
+          }
+
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email },
+            select: {
+              id: true,
+              email: true,
+              password: true,
+              role: true,
+              name: true,
+              image: true,
+            },
+          });
+
+          if (!user?.email || !user?.password) {
+            logger.warn("User not found or missing required fields", {
+              email: credentials.email,
+            });
+            return null;
+          }
+
+          const isPasswordValid = await bcrypt.compare(
+            credentials.password,
+            user.password
+          );
+
+          if (!isPasswordValid) {
+            logger.warn("Invalid password", { email: credentials.email });
+            return null;
+          }
+
+          logger.info("User authenticated successfully", { userId: user.id });
+          return {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            name: user.name ?? null,
+            image: user.image ?? null,
+          };
         } catch (error) {
+          logger.error("Authentication error", error as Error);
           return null;
         }
       },
@@ -169,58 +247,36 @@ export const authOptions: NextAuthOptions = {
   ],
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.email = user.email;
+        token.role = user.role;
+        token.name = user.name;
+        token.picture = user.image;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (token) {
+        session.user = {
+          id: token.id as string,
+          email: token.email as string,
+          role: token.role as UserRole,
+          name: token.name as string | null,
+          image: token.picture as string | null,
+        };
+      }
+      return session;
+    },
   },
   pages: {
     signIn: "/auth/signin",
     signOut: "/auth/signout",
     error: "/auth/error",
-    verifyRequest: "/auth/verify-request",
-    newUser: "/auth/new-user",
   },
-  callbacks: {
-    async session({ session }) {
-      if (!session.user?.id) {
-        return session;
-      }
-
-      try {
-        const dbUser = await prisma.user.findUnique({
-          where: { id: session.user.id },
-        });
-
-        if (!dbUser) {
-          const error = new Error(`User ${session.user.id} not found`);
-          logger.error("Session creation failed", error, {
-            userId: session.user.id,
-          });
-          return session;
-        }
-
-        if (!Object.values(UserRole).includes(dbUser.role as UserRole)) {
-          const error = new Error(`Invalid role: ${dbUser.role}`);
-          logger.error("Session creation failed", error, {
-            userId: dbUser.id,
-            role: dbUser.role,
-          });
-          return session;
-        }
-
-        session.user.role = dbUser.role as UserRole;
-        logger.info("Session created successfully", {
-          userId: dbUser.id,
-          role: dbUser.role,
-        });
-        return session;
-      } catch (error) {
-        const err =
-          error instanceof Error
-            ? error
-            : new Error("Unknown error during session handling");
-        logger.error("Session creation failed", err, {
-          userId: session.user.id,
-        });
-        return session;
-      }
-    },
-  },
+  debug: process.env.NODE_ENV === "development",
 };

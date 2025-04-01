@@ -2,17 +2,12 @@
 
 import { QueryClient, QueryClientProvider } from "react-query";
 import { ReactNode, useState } from "react";
-import { Hydrate, DehydratedState } from "react-query/hydration";
 
 interface QueryProviderProps {
   children: ReactNode;
-  dehydratedState?: DehydratedState;
 }
 
-export function QueryProvider({
-  children,
-  dehydratedState,
-}: QueryProviderProps) {
+export function QueryProvider({ children }: QueryProviderProps) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -28,8 +23,6 @@ export function QueryProvider({
   );
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <Hydrate state={dehydratedState}>{children}</Hydrate>
-    </QueryClientProvider>
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 }
