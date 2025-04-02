@@ -1,6 +1,6 @@
 "use client";
 
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -10,7 +10,9 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Clock, MapPin, Briefcase, Calendar } from "lucide-react";
+import { Clock, MapPin, Briefcase, DollarSign } from "lucide-react";
+import { memo, useMemo } from "react";
+import { motion } from "framer-motion";
 
 // Define the interface directly in this file to avoid serialization issues
 interface JobCardProps {
@@ -41,9 +43,10 @@ interface JobCardProps {
       applications: number;
     };
   };
+  index: number;
 }
 
-export function JobCard({ job }: JobCardProps) {
+const JobCard = memo(function JobCard({ job, index }: JobCardProps) {
   // Ensure all data has proper defaults to prevent rendering errors
   const {
     title = "",
@@ -61,14 +64,16 @@ export function JobCard({ job }: JobCardProps) {
     creator = { name: "Anonymous", email: "", id: "" },
   } = job || {};
 
-  // Safely format the date with a fallback
-  const formattedDate = (() => {
-    try {
-      return format(new Date(createdAt), "MMM d, yyyy");
-    } catch (error) {
-      return "Unknown date";
-    }
-  })();
+  const formattedBudget = useMemo(() => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(budget);
+  }, [budget]);
+
+  const timeAgo = useMemo(() => {
+    return formatDistanceToNow(new Date(createdAt), { addSuffix: true });
+  }, [createdAt]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -85,82 +90,88 @@ export function JobCard({ job }: JobCardProps) {
     }
   };
 
+  const cardVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.3,
+        delay: index * 0.1,
+      },
+    },
+  };
+
+  const skillBadges = useMemo(() => {
+    return skills.map((skill) => (
+      <Badge
+        key={skill}
+        variant="outline"
+        className="border-blue-500/50 text-blue-400"
+      >
+        {skill}
+      </Badge>
+    ));
+  }, [skills]);
+
   return (
-    <Card className="bg-white/5 backdrop-blur-sm border-gray-800 hover:bg-white/10 transition-colors">
-      <CardHeader>
-        <div className="flex justify-between items-start">
-          <div>
-            <h3 className="text-xl font-semibold text-white">{title}</h3>
-            <p className="text-sm text-gray-400">
-              Posted by {creator.name} • {formattedDate}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Badge variant={type === "REMOTE" ? "default" : "secondary"}>
-              {type}
-            </Badge>
-            <Badge className={getStatusColor(status)}>{status}</Badge>
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent>
-        <p className="text-gray-300 line-clamp-3">{description}</p>
-
-        <div className="mt-4 space-y-4">
-          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
-            <div className="flex items-center gap-1">
-              <Clock className="h-4 w-4" />
-              <span className="font-medium text-white">
-                ${budget}
-                {budgetType === "HOURLY" ? "/hr" : ""}
+    <motion.div
+      variants={cardVariants}
+      initial="hidden"
+      animate="visible"
+      className="mb-4"
+    >
+      <Link href={`/jobs/${job.id}`}>
+        <Card className="p-6 hover:shadow-lg transition-shadow duration-200 bg-white/5 backdrop-blur-lg hover:bg-white/10">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h3 className="text-xl font-semibold text-white hover:text-blue-400 transition-colors">
+                {title}
+              </h3>
+              <p className="text-gray-400 text-sm mt-1">
+                Posted by {creator.name} • {timeAgo}
+              </p>
+            </div>
+            <div className="text-green-400 font-semibold">
+              {formattedBudget}
+              <span className="text-gray-400 text-sm ml-1">
+                {budgetType.toLowerCase()}
               </span>
             </div>
-            <div className="flex items-center gap-1">
-              <Briefcase className="h-4 w-4" />
-              <span>{availability}</span>
+          </div>
+
+          <p className="text-gray-300 mb-4 line-clamp-2">{description}</p>
+
+          <div className="flex flex-wrap gap-4 text-sm text-gray-400 mb-4">
+            <div className="flex items-center">
+              <Briefcase className="w-4 h-4 mr-2" />
+              <Badge variant={type === "REMOTE" ? "default" : "secondary"}>
+                {type}
+              </Badge>
             </div>
-            {job.duration && (
-              <div className="flex items-center gap-1">
-                <Calendar className="h-4 w-4" />
-                <span>{job.duration}</span>
+            <div className="flex items-center">
+              <Clock className="w-4 h-4 mr-2" />
+              <span>{experienceLevel}</span>
+            </div>
+            {location && (
+              <div className="flex items-center">
+                <MapPin className="w-4 h-4 mr-2" />
+                <span>{location}</span>
               </div>
             )}
-            <div className="flex items-center gap-1">
-              <MapPin className="h-4 w-4" />
-              <span>{job.location || "Remote"}</span>
+            <div className="flex items-center">
+              <DollarSign className="w-4 h-4 mr-2" />
+              <span>{_count.applications} applications</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-sm text-gray-400">
-            <span className="font-medium text-white">
-              {_count.applications} applications
-            </span>
-            <span>•</span>
-            <span>{category}</span>
-            <span>•</span>
-            <span>{experienceLevel}</span>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {skills.map((skill, index) => (
-              <Badge
-                key={`${skill}-${index}`}
-                variant="outline"
-                className="border-blue-500/50 text-blue-400"
-              >
-                {skill}
-              </Badge>
-            ))}
-          </div>
-        </div>
-      </CardContent>
-
-      <CardFooter>
-        <Link href={`/jobs/${job.id}`} className="w-full">
-          <Button className="w-full">View Details</Button>
-        </Link>
-      </CardFooter>
-    </Card>
+          <div className="flex flex-wrap gap-2">{skillBadges}</div>
+        </Card>
+      </Link>
+    </motion.div>
   );
-}
+});
+
+JobCard.displayName = "JobCard";
+
+export default JobCard;

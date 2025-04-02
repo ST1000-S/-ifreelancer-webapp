@@ -1,21 +1,31 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { TechBackground } from "@/components/ui/TechBackground";
 import { TechCard } from "@/components/ui/TechCard";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, X, Calendar, DollarSign, Clock } from "lucide-react";
+import { popularSkills } from "@/lib/constants";
 import { logger } from "@/lib/logger";
-import Link from "next/link";
+import { Search, Filter, DollarSign, Clock, Calendar, X } from "lucide-react";
 import { motion } from "framer-motion";
+import "@/styles/jobs.css";
 
-// Define types
+// Move duration options outside component to avoid recreation
+const DURATION_OPTIONS = [
+  { value: "lessThan1Week", label: "Less than 1 week" },
+  { value: "1To2Weeks", label: "1-2 weeks" },
+  { value: "1To3Months", label: "1-3 months" },
+  { value: "3To6Months", label: "3-6 months" },
+  { value: "moreThan6Months", label: "More than 6 months" },
+] as const;
+
 interface Skill {
   id: string;
   name: string;
@@ -35,23 +45,9 @@ interface Job {
   };
 }
 
-// Mock popular skills for initial display
-const popularSkills = [
-  "React",
-  "JavaScript",
-  "Web Development",
-  "Node.js",
-  "UI/UX",
-  "Python",
-  "Mobile Development",
-  "Data Analysis",
-  "Graphic Design",
-  "Content Writing",
-];
-
 export default function JobSearch() {
-  const searchParams = useSearchParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [budgetRange, setBudgetRange] = useState([0, 10000]);
@@ -61,28 +57,15 @@ export default function JobSearch() {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [visibleSkillsCount, setVisibleSkillsCount] = useState(10);
 
-  // Duration options
-  const durationOptions = [
-    { value: "lessThan1Week", label: "Less than 1 week" },
-    { value: "1To2Weeks", label: "1-2 weeks" },
-    { value: "1To3Months", label: "1-3 months" },
-    { value: "3To6Months", label: "3-6 months" },
-    { value: "moreThan6Months", label: "More than 6 months" },
-  ];
-
   useEffect(() => {
     const fetchSkills = async () => {
       try {
-        // This would be replaced with actual API call
-        // const response = await fetch("/api/skills");
-        // const data = await response.json();
-
-        // Using mock data for now
-        const mockSkills = popularSkills.map((skill, index) => ({
-          id: `skill-${index + 1}`,
-          name: skill,
-        }));
-
+        const mockSkills = popularSkills.map(
+          (skill: string, index: number) => ({
+            id: `skill-${index + 1}`,
+            name: skill,
+          })
+        );
         setSkills(mockSkills);
       } catch (error) {
         logger.error("Error fetching skills:", error as Error);
@@ -96,7 +79,6 @@ export default function JobSearch() {
     const fetchJobs = async () => {
       setIsLoading(true);
       try {
-        // Build query parameters
         const params = new URLSearchParams();
         if (searchTerm) params.append("q", searchTerm);
         if (selectedSkills.length)
@@ -106,11 +88,6 @@ export default function JobSearch() {
         if (durationFilter.length)
           params.append("duration", durationFilter.join(","));
 
-        // This would be replaced with actual API call
-        // const response = await fetch(`/api/jobs/search?${params.toString()}`);
-        // const data = await response.json();
-
-        // Using mock data for now
         const mockJobs: Job[] = Array.from({ length: 10 }).map((_, index) => ({
           id: `job-${index + 1}`,
           title: `${searchTerm ? searchTerm + " " : ""}Job Project ${index + 1}`,
@@ -120,8 +97,9 @@ export default function JobSearch() {
             Math.random() * (budgetRange[1] - budgetRange[0]) + budgetRange[0]
           ),
           duration:
-            durationOptions[Math.floor(Math.random() * durationOptions.length)]
-              .value,
+            DURATION_OPTIONS[
+              Math.floor(Math.random() * DURATION_OPTIONS.length)
+            ].value,
           skills: selectedSkills.length
             ? selectedSkills.map((skill, i) => ({
                 id: `skill-${i}`,
@@ -202,29 +180,27 @@ export default function JobSearch() {
 
   return (
     <TechBackground>
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">
-            Find the Perfect Job
-          </h1>
-          <p className="text-gray-300">
+      <div className="job-search-container">
+        <div className="job-search-header">
+          <h1 className="job-search-title">Find the Perfect Job</h1>
+          <p className="job-search-description">
             Search through thousands of projects and find your next opportunity
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="job-search-grid">
           {/* Filters Section */}
           <div className="lg:col-span-1">
-            <TechCard className="sticky top-24 p-6">
-              <div className="mb-6">
-                <h2 className="text-lg font-semibold mb-4 flex items-center">
-                  <Filter size={18} className="mr-2" />
+            <TechCard className="job-filters p-6">
+              <div className="job-filter-section">
+                <h2 className="job-filter-title">
+                  <Filter size={18} className="job-filter-icon" />
                   Filters
                 </h2>
 
                 {/* Search form */}
-                <form onSubmit={handleSearch} className="mb-6">
-                  <div className="relative">
+                <form onSubmit={handleSearch} className="job-search-form">
+                  <div className="job-search-input">
                     <Input
                       type="text"
                       placeholder="Search jobs..."
@@ -236,7 +212,7 @@ export default function JobSearch() {
                       type="submit"
                       variant="ghost"
                       size="icon"
-                      className="absolute right-0 top-0 h-full"
+                      className="job-search-button"
                     >
                       <Search size={18} />
                     </Button>
@@ -244,21 +220,19 @@ export default function JobSearch() {
                 </form>
 
                 {/* Budget Range */}
-                <div className="mb-6">
-                  <h3 className="text-sm font-medium mb-3 flex items-center">
-                    <DollarSign size={16} className="mr-1" />
+                <div className="job-budget-section">
+                  <h3 className="job-budget-title">
+                    <DollarSign size={16} className="job-budget-icon" />
                     Budget Range
                   </h3>
-                  <div className="mb-2">
-                    <Slider
-                      defaultValue={[0, 10000]}
-                      max={10000}
-                      step={100}
-                      value={budgetRange}
-                      onValueChange={setBudgetRange}
-                      className="my-6"
-                    />
-                  </div>
+                  <Slider
+                    defaultValue={[0, 10000]}
+                    max={10000}
+                    step={100}
+                    value={budgetRange}
+                    onValueChange={setBudgetRange}
+                    className="job-budget-slider"
+                  />
                   <div className="flex justify-between text-sm text-gray-600">
                     <span>{formatBudget(budgetRange[0])}</span>
                     <span>{formatBudget(budgetRange[1])}</span>
@@ -266,13 +240,13 @@ export default function JobSearch() {
                 </div>
 
                 {/* Duration Filter */}
-                <div className="mb-6">
-                  <h3 className="text-sm font-medium mb-3 flex items-center">
-                    <Clock size={16} className="mr-1" />
+                <div className="job-duration-section">
+                  <h3 className="job-duration-title">
+                    <Clock size={16} className="job-duration-icon" />
                     Project Duration
                   </h3>
                   <div className="space-y-2">
-                    {durationOptions.map((option) => (
+                    {DURATION_OPTIONS.map((option) => (
                       <div key={option.value} className="flex items-center">
                         <Checkbox
                           id={option.value}
@@ -291,8 +265,8 @@ export default function JobSearch() {
                 </div>
 
                 {/* Skills */}
-                <div>
-                  <h3 className="text-sm font-medium mb-3">Skills</h3>
+                <div className="job-skills-section">
+                  <h3 className="job-skills-title">Skills</h3>
                   <div className="flex flex-wrap gap-2 mb-3">
                     {selectedSkills.map((skill) => (
                       <Badge
@@ -455,7 +429,7 @@ export default function JobSearch() {
                                   className="mr-1 text-primary"
                                 />
                                 <span>
-                                  {durationOptions.find(
+                                  {DURATION_OPTIONS.find(
                                     (d) => d.value === job.duration
                                   )?.label || job.duration}
                                 </span>

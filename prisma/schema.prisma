@@ -85,6 +85,10 @@ model Profile {
 
   @@index([skills])
   @@index([languages])
+  @@index([hourlyRate])
+  @@index([location])
+  @@index([availability])
+  @@fulltext([bio, title])
 }
 
 model Portfolio {
@@ -221,6 +225,9 @@ model Job {
   @@index([skills])
   @@index([createdAt])
   @@index([budget])
+  @@index([experienceLevel])
+  @@index([availability])
+  @@fulltext([title, description])
 }
 
 model JobApplication {
@@ -236,6 +243,8 @@ model JobApplication {
 
   @@index([applicantId])
   @@index([jobId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model Review {

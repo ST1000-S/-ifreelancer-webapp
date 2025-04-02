@@ -1,25 +1,68 @@
 import { PrismaClient } from "@prisma/client";
 import { logger } from "./logger";
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
+// PrismaClient is attached to the `global` object in development to prevent
+// exhausting your database connection limit.
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
-const prismaClientSingleton = () => {
-  return new PrismaClient({
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["query", "error", "warn"]
-        : ["error"],
-    errorFormat: "pretty",
+export const prisma =
+  globalForPrisma.prisma ||
+  new PrismaClient({
+    log: [
+      {
+        emit: "event",
+        level: "query",
+      },
+      {
+        emit: "event",
+        level: "error",
+      },
+      {
+        emit: "event",
+        level: "info",
+      },
+      {
+        emit: "event",
+        level: "warn",
+      },
+    ],
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL,
+      },
+    },
+    // Configure connection pooling
+    connection: {
+      pool: {
+        min: 2,
+        max: 10,
+        idleTimeoutMillis: 30000,
+        acquireTimeoutMillis: 30000,
+      },
+    },
   });
-};
 
-export const prisma = globalForPrisma.prisma ?? prismaClientSingleton();
+// Logging middleware
+prisma.$on("query", (e: any) => {
+  logger.debug("Query: " + e.query);
+  logger.debug("Duration: " + e.duration + "ms");
+});
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-}
+prisma.$on("error", (e: any) => {
+  logger.error("Prisma Error: " + e.message);
+});
+
+prisma.$on("info", (e: any) => {
+  logger.info("Prisma Info: " + e.message);
+});
+
+prisma.$on("warn", (e: any) => {
+  logger.warn("Prisma Warning: " + e.message);
+});
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+export default prisma;
 
 // Handle cleanup
 process.on("beforeExit", async () => {

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { Portfolio, PortfolioFormData } from "@/types/profile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,15 +16,18 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { format } from "date-fns";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
+import { PortfolioCard } from "./PortfolioCard";
 
 interface PortfolioSectionProps {
   items: Portfolio[];
+  isOwner?: boolean;
 }
 
-export default function PortfolioSection({ items }: PortfolioSectionProps) {
+export default function PortfolioSection({
+  items,
+  isOwner = false,
+}: PortfolioSectionProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -113,184 +115,155 @@ export default function PortfolioSection({ items }: PortfolioSectionProps) {
   };
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-medium">Portfolio Projects</h3>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Project
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Portfolio Project</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="title">Project Title</Label>
-                <Input
-                  id="title"
-                  name="title"
-                  value={formData.title}
-                  onChange={handleChange}
-                  placeholder="e.g. E-commerce Website"
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleChange}
-                  placeholder="Describe your project..."
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="skills">Skills Used</Label>
-                <MultiSelect
-                  id="skills"
-                  value={formData.skills}
-                  onChange={handleSkillsChange}
-                  options={[
-                    "JavaScript",
-                    "TypeScript",
-                    "React",
-                    "Node.js",
-                    "Python",
-                    "Java",
-                    "C++",
-                    "AWS",
-                    "Docker",
-                    "Kubernetes",
-                  ]}
-                  placeholder="Select skills used in the project"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="projectUrl">Project URL</Label>
-                <Input
-                  id="projectUrl"
-                  name="projectUrl"
-                  type="url"
-                  value={formData.projectUrl || ""}
-                  onChange={handleChange}
-                  placeholder="e.g. https://project.com"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="imageUrl">Image URL</Label>
-                <Input
-                  id="imageUrl"
-                  name="imageUrl"
-                  type="url"
-                  value={formData.imageUrl || ""}
-                  onChange={handleChange}
-                  placeholder="e.g. https://image.com/preview.jpg"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="text-2xl font-semibold">Portfolio Projects</h3>
+        {isOwner && (
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Project
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Portfolio Project</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <Label htmlFor="startDate">Start Date</Label>
+                  <Label htmlFor="title">Project Title</Label>
                   <Input
-                    id="startDate"
-                    name="startDate"
-                    type="date"
-                    value={
-                      formData.startDate
-                        ? format(formData.startDate, "yyyy-MM-dd")
-                        : ""
-                    }
-                    onChange={handleDateChange}
+                    id="title"
+                    name="title"
+                    value={formData.title}
+                    onChange={handleChange}
+                    placeholder="e.g. E-commerce Website"
                     required
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="endDate">End Date</Label>
-                  <Input
-                    id="endDate"
-                    name="endDate"
-                    type="date"
-                    value={
-                      formData.endDate
-                        ? format(formData.endDate, "yyyy-MM-dd")
-                        : ""
-                    }
-                    onChange={handleDateChange}
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    name="description"
+                    value={formData.description}
+                    onChange={handleChange}
+                    placeholder="Describe your project..."
+                    required
                   />
                 </div>
-              </div>
 
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Adding..." : "Add Project"}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <div>
+                  <Label htmlFor="skills">Skills Used</Label>
+                  <MultiSelect
+                    value={formData.skills}
+                    onChange={handleSkillsChange}
+                    options={[
+                      "JavaScript",
+                      "TypeScript",
+                      "React",
+                      "Node.js",
+                      "Python",
+                      "Java",
+                      "C++",
+                      "AWS",
+                      "Docker",
+                      "Kubernetes",
+                    ]}
+                    placeholder="Select skills used in the project"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="projectUrl">Project URL</Label>
+                  <Input
+                    id="projectUrl"
+                    name="projectUrl"
+                    type="url"
+                    value={formData.projectUrl || ""}
+                    onChange={handleChange}
+                    placeholder="e.g. https://project.com"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="imageUrl">Image URL</Label>
+                  <Input
+                    id="imageUrl"
+                    name="imageUrl"
+                    type="url"
+                    value={formData.imageUrl || ""}
+                    onChange={handleChange}
+                    placeholder="e.g. https://image.com/preview.jpg"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="startDate">Start Date</Label>
+                    <Input
+                      id="startDate"
+                      name="startDate"
+                      type="date"
+                      value={
+                        formData.startDate
+                          ? new Date(formData.startDate)
+                              .toISOString()
+                              .split("T")[0]
+                          : ""
+                      }
+                      onChange={handleDateChange}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="endDate">End Date</Label>
+                    <Input
+                      id="endDate"
+                      name="endDate"
+                      type="date"
+                      value={
+                        formData.endDate
+                          ? new Date(formData.endDate)
+                              .toISOString()
+                              .split("T")[0]
+                          : ""
+                      }
+                      onChange={handleDateChange}
+                    />
+                  </div>
+                </div>
+
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? "Adding..." : "Add Project"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {items.map((item) => (
-          <div
-            key={item.id}
-            className="border rounded-lg p-4 relative group hover:shadow-md transition-shadow"
-          >
-            {item.imageUrl && (
-              <div className="aspect-video rounded-md overflow-hidden mb-4">
-                <Image
-                  src={item.imageUrl}
-                  alt={item.title}
-                  width={400}
-                  height={225}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            )}
-            <h4 className="text-lg font-semibold mb-2">{item.title}</h4>
-            <p className="text-sm text-gray-600 mb-4">{item.description}</p>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {item.skills.map((skill) => (
-                <Badge key={skill} variant="secondary">
-                  {skill}
-                </Badge>
-              ))}
-            </div>
-            <div className="text-sm text-gray-500">
-              {format(new Date(item.startDate), "MMM yyyy")} -{" "}
-              {item.endDate
-                ? format(new Date(item.endDate), "MMM yyyy")
-                : "Present"}
-            </div>
-            {item.projectUrl && (
-              <a
-                href={item.projectUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-blue-600 hover:underline mt-2 block"
-              >
-                View Project
-              </a>
-            )}
-            <button
-              onClick={() => handleDelete(item.id)}
-              className="absolute top-2 right-2 p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-100"
-              title="Delete project"
-            >
-              <Trash2 className="h-4 w-4 text-red-500" />
-            </button>
-          </div>
-        ))}
-      </div>
+      {items.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">
+            No portfolio projects added yet.
+            {isOwner && " Click the Add Project button to showcase your work."}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {items.map((item) => (
+            <PortfolioCard
+              key={item.id}
+              item={item}
+              onDelete={isOwner ? handleDelete : undefined}
+              isOwner={isOwner}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

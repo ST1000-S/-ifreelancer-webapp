@@ -370,7 +370,7 @@ export default function Dashboard() {
       </div>
 
       <div className="mt-8">
-        <TechCard className="p-6">
+        <TechCard className="p-6 bg-white/80 backdrop-blur-sm shadow-lg">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-semibold">
               {session?.user?.role === "CLIENT"
@@ -466,10 +466,7 @@ function StatCard({
   icon: React.ReactNode;
 }) {
   return (
-    <TechCard
-      className="p-6 hover:shadow-md transition-shadow"
-      glowIntensity="low"
-    >
+    <TechCard className="p-6" glowIntensity="low">
       <div className="flex justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">{title}</h3>

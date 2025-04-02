@@ -1,17 +1,27 @@
 import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
 import ReceivedApplicationList from "@/components/ReceivedApplicationList";
+import { JobApplication, Job, Profile, User } from "@prisma/client";
+
+interface ApplicationWithRelations extends JobApplication {
+  job: Job;
+  applicant: User & {
+    profile: Profile;
+  };
+  proposedRate?: number | null;
+}
 
 export default async function ReceivedApplicationsPage() {
-  const session = await getServerSession();
+  const session = await getServerSession(authOptions);
 
-  if (!session?.user?.email) {
-    redirect("/api/auth/signin");
+  if (!session) {
+    redirect("/auth/signin");
   }
 
   try {
-    const applications = await prisma.jobApplication.findMany({
+    const applications = (await prisma.jobApplication.findMany({
       where: {
         job: {
           creatorId: session.user.id,
@@ -28,73 +38,68 @@ export default async function ReceivedApplicationsPage() {
       orderBy: {
         createdAt: "desc",
       },
-    });
+    })) as unknown as ApplicationWithRelations[];
 
-    // Get the schema of fields actually available in jobApplication
-    const serializedApplications = applications.map((application) => {
-      const serializedApp = {
-        id: application.id,
-        jobId: application.jobId,
-        applicantId: application.applicantId,
-        coverLetter: application.coverLetter,
-        status: application.status,
-        createdAt: application.createdAt.toISOString(),
-        updatedAt: application.updatedAt.toISOString(),
-        job: {
-          id: application.job.id,
-          title: application.job.title,
-          description: application.job.description,
-          budget: application.job.budget,
-          budgetType: application.job.budgetType,
-          type: application.job.type,
-          status: application.job.status,
-          category: application.job.category,
-          experienceLevel: application.job.experienceLevel,
-          availability: application.job.availability,
-          location: application.job.location || undefined,
-          duration: application.job.duration
-            ? String(application.job.duration)
-            : undefined,
-          skills: Array.isArray(application.job.skills)
-            ? application.job.skills
-            : [],
-          createdAt: application.job.createdAt.toISOString(),
-          updatedAt: application.job.updatedAt.toISOString(),
-          creatorId: application.job.creatorId,
-        },
-        applicant: {
-          id: application.applicant.id,
-          name: application.applicant.name,
-          email: application.applicant.email,
-          image: application.applicant.image,
-          profile: null,
-        },
-      };
-
-      // Add proposedRate only if it exists
-      if ("proposedRate" in application) {
-        // @ts-ignore - we're checking if the property exists dynamically
-        serializedApp.proposedRate = application.proposedRate;
-      }
-
-      // Safely handle profile data
-      if (application.applicant.profile) {
-        serializedApp.applicant.profile = {
-          id: application.applicant.profile.id,
-          userId: application.applicant.profile.userId,
-          title: application.applicant.profile.title,
-          bio: application.applicant.profile.bio,
-          hourlyRate: application.applicant.profile.hourlyRate,
-          skills: application.applicant.profile.skills,
-          availability: application.applicant.profile.availability,
-          location: application.applicant.profile.location,
-          createdAt: application.applicant.profile.createdAt.toISOString(),
-          updatedAt: application.applicant.profile.updatedAt.toISOString(),
+    const serializedApplications = applications.map(
+      (application: ApplicationWithRelations) => {
+        const serializedApp = {
+          id: application.id,
+          jobId: application.jobId,
+          applicantId: application.applicantId,
+          coverLetter: application.coverLetter,
+          proposedRate: application.proposedRate,
+          status: application.status,
+          createdAt: application.createdAt.toISOString(),
+          updatedAt: application.updatedAt.toISOString(),
+          job: {
+            id: application.job.id,
+            title: application.job.title,
+            description: application.job.description,
+            budget: application.job.budget,
+            budgetType: application.job.budgetType,
+            type: application.job.type,
+            status: application.job.status,
+            category: application.job.category,
+            experienceLevel: application.job.experienceLevel,
+            availability: application.job.availability,
+            location: application.job.location || undefined,
+            duration: application.job.duration
+              ? String(application.job.duration)
+              : undefined,
+            skills: Array.isArray(application.job.skills)
+              ? application.job.skills
+              : [],
+            createdAt: application.job.createdAt.toISOString(),
+            updatedAt: application.job.updatedAt.toISOString(),
+            creatorId: application.job.creatorId,
+          },
+          applicant: {
+            id: application.applicant.id,
+            name: application.applicant.name,
+            email: application.applicant.email,
+            image: application.applicant.image,
+            profile: application.applicant.profile
+              ? {
+                  id: application.applicant.profile.id,
+                  userId: application.applicant.profile.userId,
+                  title: application.applicant.profile.title,
+                  bio: application.applicant.profile.bio,
+                  hourlyRate: application.applicant.profile.hourlyRate,
+                  skills: application.applicant.profile.skills,
+                  availability: application.applicant.profile.availability,
+                  location: application.applicant.profile.location,
+                  createdAt:
+                    application.applicant.profile.createdAt.toISOString(),
+                  updatedAt:
+                    application.applicant.profile.updatedAt.toISOString(),
+                }
+              : null,
+          },
         };
-      }
 
-      return serializedApp;
-    });
+        return serializedApp;
+      }
+    );
 
     return (
       <div className="container mx-auto py-8">

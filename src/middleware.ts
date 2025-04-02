@@ -28,7 +28,7 @@ export async function middleware(request: NextRequest) {
     // Check if path is an auth page
     const isAuthPage = path.startsWith("/auth");
 
-    // If user is already authenticated and tries to access an auth page, redirect to dashboard
+    // If user is authenticated and tries to access an auth page, redirect to dashboard
     if (token && isAuthPage) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
@@ -36,21 +36,33 @@ export async function middleware(request: NextRequest) {
     // For protected routes, redirect to signin if not authenticated
     if (!isPublicPath && !token) {
       const signinUrl = new URL("/auth/signin", request.url);
-      signinUrl.searchParams.set("callbackUrl", request.url);
+      // Ensure we're not passing sensitive data in the URL
+      const sanitizedCallbackUrl = request.nextUrl.pathname;
+      signinUrl.searchParams.set("callbackUrl", sanitizedCallbackUrl);
       return NextResponse.redirect(signinUrl);
     }
 
+    // Allow the request to proceed
     return NextResponse.next();
   } catch (error) {
     console.error("Middleware error:", error);
-    // If there's an error, redirect to the error page
+    // If there's an error, redirect to the error page with a generic message
     const errorUrl = new URL("/auth/error", request.url);
-    errorUrl.searchParams.set("error", "Configuration");
+    errorUrl.searchParams.set("error", "AuthenticationError");
     return NextResponse.redirect(errorUrl);
   }
 }
 
 // Configure which paths the middleware should run on
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api/auth (NextAuth.js authentication endpoints)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    "/((?!api/auth|_next/static|_next/image|favicon.ico).*)",
+  ],
 };

@@ -1,0 +1,156 @@
+/* Job Search Container */
+.job-search-container {
+  @apply container mx-auto px-4 py-8;
+}
+
+/* Job Search Header */
+.job-search-header {
+  @apply text-center mb-12;
+}
+
+.job-search-title {
+  @apply text-4xl font-bold text-white mb-4;
+}
+
+.job-search-description {
+  @apply text-lg text-gray-300;
+}
+
+/* Job Search Grid */
+.job-search-grid {
+  @apply grid grid-cols-1 lg:grid-cols-4 gap-8;
+}
+
+/* Job Filters */
+.job-filters {
+  @apply sticky top-24 space-y-6 bg-white/10 backdrop-blur-lg;
+}
+
+.job-filter-section {
+  @apply space-y-4;
+}
+
+.job-filter-title {
+  @apply text-xl font-semibold flex items-center gap-2 text-white mb-4;
+}
+
+.job-filter-icon {
+  @apply text-blue-400;
+}
+
+/* Job Search Form */
+.job-search-form {
+  @apply relative;
+}
+
+.job-search-input {
+  @apply relative;
+}
+
+.job-search-button {
+  @apply absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600;
+}
+
+/* Budget Section */
+.job-budget-section {
+  @apply space-y-4;
+}
+
+.job-budget-title {
+  @apply text-sm font-medium flex items-center gap-2 text-white;
+}
+
+.job-budget-icon {
+  @apply text-green-400;
+}
+
+.job-budget-slider {
+  @apply mt-2;
+}
+
+/* Duration Section */
+.job-duration-section {
+  @apply space-y-4;
+}
+
+.job-duration-title {
+  @apply text-sm font-medium flex items-center gap-2 text-white;
+}
+
+.job-duration-icon {
+  @apply text-purple-400;
+}
+
+/* Skills Section */
+.job-skills-section {
+  @apply space-y-4;
+}
+
+.job-skills-title {
+  @apply text-sm font-medium flex items-center gap-2 text-white;
+}
+
+.job-skills-icon {
+  @apply text-yellow-400;
+}
+
+.job-skills-grid {
+  @apply grid grid-cols-2 gap-2;
+}
+
+/* Job Results */
+.job-results {
+  @apply lg:col-span-3;
+}
+
+.job-card {
+  @apply bg-white/10 backdrop-blur-lg rounded-lg p-6 mb-4 hover:bg-white/20 transition-all duration-200;
+}
+
+.job-card-header {
+  @apply flex justify-between items-start mb-4;
+}
+
+.job-card-title {
+  @apply text-xl font-semibold text-white hover:text-blue-400 transition-colors;
+}
+
+.job-card-budget {
+  @apply text-green-400 font-semibold;
+}
+
+.job-card-description {
+  @apply text-gray-300 mb-4;
+}
+
+.job-card-meta {
+  @apply flex flex-wrap gap-4 text-sm text-gray-400;
+}
+
+.job-card-skills {
+  @apply flex flex-wrap gap-2 mt-4;
+}
+
+.job-skill-badge {
+  @apply bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full text-xs;
+}
+
+/* Loading State */
+.job-loading {
+  @apply flex justify-center items-center min-h-[200px];
+}
+
+.job-loading-spinner {
+  @apply w-8 h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 1024px) {
+  .job-filters {
+    @apply static mb-8;
+  }
+
+  .job-search-grid {
+    @apply grid-cols-1;
+  }
+}

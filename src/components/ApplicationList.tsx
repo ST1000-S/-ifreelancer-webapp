@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 // Define our own interfaces for serialized data
 interface SerializedJob {
@@ -46,7 +48,57 @@ interface ApplicationListProps {
   applications: SerializedApplication[];
 }
 
-export function ApplicationList({ applications }: ApplicationListProps) {
+export function ApplicationList({
+  applications: initialApplications,
+}: ApplicationListProps) {
+  const [applications, setApplications] =
+    useState<SerializedApplication[]>(initialApplications);
+
+  useEffect(() => {
+    let eventSource: EventSource;
+
+    const connectToSSE = () => {
+      eventSource = new EventSource("/api/applications/status-updates");
+
+      eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "status-update") {
+          setApplications((prevApps) =>
+            prevApps.map((app) => {
+              if (app.id === data.applicationId) {
+                toast.success(
+                  `Application status for "${data.jobTitle}" updated to ${data.status}`
+                );
+                return {
+                  ...app,
+                  status: data.status,
+                  updatedAt: data.updatedAt,
+                };
+              }
+              return app;
+            })
+          );
+        }
+      };
+
+      eventSource.onerror = (error) => {
+        console.error("SSE Error:", error);
+        eventSource.close();
+        // Attempt to reconnect after 5 seconds
+        setTimeout(connectToSSE, 5000);
+      };
+    };
+
+    connectToSSE();
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
+  }, []);
+
   if (!applications || applications.length === 0) {
     return (
       <div className="text-center py-8">

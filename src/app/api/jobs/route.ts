@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { JobType, JobCategory, JobStatus, Prisma } from "@prisma/client";
+import { revalidatePath } from "next/cache";
 
 // Define the enums locally since they're not exported by Prisma yet
 export enum JobDuration {
@@ -34,6 +35,9 @@ const jobSchema = z.object({
 type WhereClause = Prisma.JobWhereInput;
 type OrderByClause = Prisma.JobOrderByWithRelationInput;
 
+// Cache duration in seconds
+const CACHE_DURATION = 60;
+
 // POST /api/jobs - Create a new job
 export async function POST(req: Request) {
   try {
@@ -60,6 +64,9 @@ export async function POST(req: Request) {
         status: JobStatus.OPEN,
       },
     });
+
+    // Revalidate the jobs page
+    revalidatePath("/jobs");
 
     return Response.json(job);
   } catch (error) {
@@ -273,12 +280,27 @@ export async function GET(req: Request) {
       filters: Object.keys(where).length - 1, // Subtract the default status filter
     });
 
-    return Response.json({
+    // Cache the response
+    const response = {
       jobs: serializedJobs,
       total,
       totalPages,
       currentPage: page,
+    };
+    const responseText = JSON.stringify(response);
+    const newResponse = new NextResponse(responseText, {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": `public, s-maxage=${CACHE_DURATION}`,
+      },
     });
+
+    await caches.default.put(
+      `jobs-${JSON.stringify({ where, skip: (page - 1) * limit, limit })}`,
+      newResponse.clone()
+    );
+
+    return newResponse;
   } catch (error) {
     logger.error("Error fetching jobs:", {
       error: error as Error,
@@ -286,7 +308,17 @@ export async function GET(req: Request) {
       name: (error as Error).name,
       message: (error as Error).message,
     });
-    return new Response("Internal Server Error", { status: 500 });
+    return new NextResponse(
+      JSON.stringify({
+        error: "Internal Server Error",
+      }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
   }
 }
 

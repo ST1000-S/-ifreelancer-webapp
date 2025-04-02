@@ -13,6 +13,14 @@ export const metadata = {
   description: "Find the best freelancers for your projects",
 };
 
+function LoadingSpinner() {
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-gray-100/50">
+      <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  );
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -21,15 +29,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <Suspense fallback={<div>Loading...</div>}>
-          <SessionProvider>
-            <QueryProvider>
+        <SessionProvider>
+          <QueryProvider>
+            <Suspense fallback={<LoadingSpinner />}>
               <Navigation />
               {children}
-              <Toaster />
-            </QueryProvider>
-          </SessionProvider>
-        </Suspense>
+            </Suspense>
+            <Toaster position="top-right" />
+          </QueryProvider>
+        </SessionProvider>
       </body>
     </html>
   );

@@ -33,44 +33,39 @@ export default function SignInForm() {
 
     try {
       const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
-      console.log("Attempting sign in with callback URL:", callbackUrl);
+      logger.info("Attempting sign in with callback URL:", { callbackUrl });
 
       const result = await signIn("credentials", {
         email: formData.email,
         password: formData.password,
         redirect: false,
-        callbackUrl,
       });
 
       if (!result) {
-        console.error("No result from signIn");
         throw new Error("Authentication failed - No response from server");
       }
 
       if (result.error) {
-        console.error("Sign in error:", result.error);
         logger.error("Sign in error", new Error(result.error));
         toast({
           title: "Error",
           description:
             result.error === "CredentialsSignin"
               ? "Invalid email or password"
-              : result.error,
+              : "An error occurred during sign in",
           variant: "destructive",
         });
         return;
       }
 
-      if (result.url) {
-        console.log("Sign in successful, redirecting to:", result.url);
-        toast({
-          title: "Success",
-          description: "Signed in successfully",
-        });
+      toast({
+        title: "Success",
+        description: "Signed in successfully",
+      });
 
-        router.push(result.url);
-        router.refresh();
-      }
+      // Use router.replace instead of push to prevent back navigation to login
+      await router.replace(callbackUrl);
+      router.refresh();
     } catch (error) {
       console.error("Sign in error:", error);
       logger.error("Sign in error", error as Error);
