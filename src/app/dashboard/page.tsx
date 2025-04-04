@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { logger } from "@/lib/logger";
 import { TechCard } from "@/components/ui/TechCard";
+import { useToast } from "@/components/ui/use-toast";
 
 interface DashboardStats {
   totalJobs?: number;
@@ -33,71 +34,100 @@ interface RecentActivity {
   description?: string;
 }
 
-interface ActivityResponse {
-  activities: RecentActivity[];
-}
-
 export default function Dashboard() {
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const [stats, setStats] = useState<DashboardStats>({});
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const { toast } = useToast();
 
   useEffect(() => {
+    // Don't fetch data until we have session information
+    if (sessionStatus === "loading") return;
+
     const fetchDashboardData = async () => {
       setIsLoading(true);
+      setError("");
+
       try {
-        const statsResponse = await fetch("/api/dashboard/stats");
-        const activityResponse = await fetch("/api/dashboard/activity");
+        // Fetch stats and activity data in parallel
+        const [statsResponse, activityResponse] = await Promise.all([
+          fetch("/api/dashboard/stats", {
+            headers: {
+              "Cache-Control": "no-cache",
+            },
+          }),
+          fetch("/api/dashboard/activity", {
+            headers: {
+              "Cache-Control": "no-cache",
+            },
+          }),
+        ]);
 
-        const statsData = await statsResponse.json();
-
-        // Handle activity data with fallback for development
-        let activityData: ActivityResponse = { activities: [] };
-        try {
-          activityData = await activityResponse.json();
-        } catch (error) {
-          logger.info("Using mock activity data for development");
-          // Mock data for development
-          activityData = {
-            activities: [
-              {
-                id: "1",
-                type: "application",
-                title: "Your application was accepted",
-                date: new Date().toISOString(),
-                status: "ACCEPTED",
-                description: "Web Development Project",
-              },
-              {
-                id: "2",
-                type: "job",
-                title: "New job matching your skills",
-                date: new Date(Date.now() - 86400000).toISOString(),
-                description: "Mobile App Developer needed",
-              },
-              {
-                id: "3",
-                type: "message",
-                title: "New message received",
-                date: new Date(Date.now() - 172800000).toISOString(),
-                description: "From: John Smith",
-              },
-            ],
-          };
+        // Check for errors in the stats response
+        if (!statsResponse.ok) {
+          const errorData = await statsResponse.json();
+          throw new Error(
+            errorData.message || "Failed to fetch dashboard statistics"
+          );
         }
 
+        const statsData = await statsResponse.json();
         setStats(statsData);
-        setRecentActivity(activityData.activities || []);
+
+        // Handle activity data with fallback for development
+        if (activityResponse.ok) {
+          const activityData = await activityResponse.json();
+          setRecentActivity(activityData.activities || []);
+        } else {
+          logger.warn("Using mock activity data due to API error");
+          // Mock data for development
+          setRecentActivity([
+            {
+              id: "1",
+              type: "application",
+              title: "Your application was accepted",
+              date: new Date().toISOString(),
+              status: "ACCEPTED",
+              description: "Web Development Project",
+            },
+            {
+              id: "2",
+              type: "job",
+              title: "New job matching your skills",
+              date: new Date(Date.now() - 86400000).toISOString(),
+              description: "Mobile App Developer needed",
+            },
+            {
+              id: "3",
+              type: "message",
+              title: "New message received",
+              date: new Date(Date.now() - 172800000).toISOString(),
+              description: "From: John Smith",
+            },
+          ]);
+        }
       } catch (error) {
         logger.error("Error fetching dashboard data:", error as Error);
+        setError(
+          "Failed to load dashboard data. Please refresh and try again."
+        );
+        toast({
+          title: "Error loading dashboard",
+          description:
+            error instanceof Error
+              ? error.message
+              : "An unexpected error occurred",
+          variant: "destructive",
+        });
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchDashboardData();
-  }, []);
+  }, [sessionStatus, toast]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -127,6 +157,17 @@ export default function Dashboard() {
     }
   };
 
+  if (sessionStatus === "loading") {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-4 text-gray-600">Loading session...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
@@ -138,12 +179,32 @@ export default function Dashboard() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <div className="text-center p-6 max-w-md mx-auto">
+          <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Error Loading Dashboard
+          </h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90"
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold">
-            Welcome back, {session?.user?.name}!
+            Welcome back, {session?.user?.name || "User"}!
           </h1>
           <p className="text-gray-600 mt-1">
             Here&apos;s what&apos;s happening with your{" "}
@@ -201,28 +262,28 @@ export default function Dashboard() {
         ) : (
           <>
             <StatCard
-              title="Available Jobs"
+              title="Applied Jobs"
               value={stats.totalJobs || 0}
-              description="Jobs matching your skills"
+              description="Jobs you applied to"
               icon={<Briefcase className="text-blue-500" size={24} />}
             />
             <StatCard
-              title="My Applications"
-              value={stats.applications || 0}
-              description="Jobs you've applied to"
-              icon={<Users className="text-purple-500" size={24} />}
+              title="Active Applications"
+              value={stats.activeJobs || 0}
+              description="Applications in review"
+              icon={<Clock className="text-yellow-500" size={24} />}
             />
             <StatCard
-              title="Active Jobs"
-              value={stats.activeJobs || 0}
-              description="Jobs in progress"
-              icon={<Clock className="text-green-500" size={24} />}
+              title="Accepted Applications"
+              value={stats.applications || 0}
+              description="Applications accepted"
+              icon={<Check className="text-green-500" size={24} />}
             />
             <StatCard
               title="Completed Jobs"
               value={stats.completedJobs || 0}
-              description="Successfully completed jobs"
-              icon={<Check className="text-indigo-500" size={24} />}
+              description="Jobs you've completed"
+              icon={<CalendarDays className="text-indigo-500" size={24} />}
             />
           </>
         )}
@@ -466,14 +527,16 @@ function StatCard({
   icon: React.ReactNode;
 }) {
   return (
-    <TechCard className="p-6" glowIntensity="low">
-      <div className="flex justify-between">
+    <TechCard className="p-6">
+      <div className="flex items-center">
+        <div className="bg-white/20 p-4 rounded-full mr-4">{icon}</div>
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-          <p className="text-3xl font-bold text-primary mt-2">{value}</p>
-          <p className="text-sm text-gray-500 mt-1">{description}</p>
+          <h3 className="font-semibold text-lg text-white">{title}</h3>
+          <p className="text-sm text-gray-300">{description}</p>
         </div>
-        <div className="bg-gray-100 rounded-full p-3 h-fit">{icon}</div>
+      </div>
+      <div className="mt-4">
+        <p className="text-3xl font-bold text-white">{value}</p>
       </div>
     </TechCard>
   );

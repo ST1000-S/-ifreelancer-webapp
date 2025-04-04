@@ -1,9 +1,9 @@
 import { Resend } from "resend";
-import { logger } from "./logger";
+import { Logger } from "./logger";
 
 if (!process.env.RESEND_API_KEY) {
   const error = new Error("RESEND_API_KEY is not defined");
-  logger.error("Environment variable missing", error);
+  Logger.error("Environment variable missing", error);
   throw error;
 }
 
@@ -18,10 +18,10 @@ resend.emails
     html: "Testing Resend connection",
   })
   .then(() => {
-    logger.info("Resend service initialized successfully");
+    Logger.info("Resend service initialized successfully");
   })
   .catch((error: Error) => {
-    logger.error("Failed to initialize Resend service", error);
+    Logger.error("Failed to initialize Resend service", error);
   });
 
 export default resend;

@@ -1,85 +1,62 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { AuthForm } from "@/components/AuthForm";
-import Link from "next/link";
-import { TechBackground } from "@/components/ui/TechBackground";
-import { TechCard } from "@/components/ui/TechCard";
+import { SignUpForm } from "@/components/auth/SignUpForm";
+import MatrixRain from "@/components/effects/MatrixRain";
 import { motion } from "framer-motion";
+import Image from "next/image";
 
-type SignUpData = {
-  email: string;
-  password: string;
-  name: string;
-  role: string;
-};
-
-export default function SignUp() {
-  const router = useRouter();
-  const [error, setError] = useState<string>();
-
-  const handleSubmit = async (data: SignUpData) => {
-    try {
-      const response = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        setError(result.error);
-      } else {
-        router.push("/auth/signin");
-      }
-    } catch (error) {
-      setError("An error occurred. Please try again.");
-    }
-  };
-
+export default function SignUpPage() {
   return (
-    <TechBackground>
-      <div className="flex items-center justify-center min-h-screen py-12 px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="w-full max-w-md flex flex-col items-center"
-        >
-          <motion.div
-            className="text-center mb-6"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-          >
-            <h1 className="text-4xl font-bold text-blue-400 mb-2">
-              iFreelancer
-            </h1>
-            <h2 className="text-3xl font-extrabold text-white">
-              Create an Account
-            </h2>
-            <p className="mt-2 text-center text-sm text-gray-300">
-              Join iFreelancer and start your journey
-            </p>
-          </motion.div>
-
-          <TechCard className="w-full">
-            <AuthForm mode="signup" onSubmit={handleSubmit} error={error} />
-          </TechCard>
-
-          <p className="mt-6 text-center text-sm text-gray-300">
-            Already have an account?{" "}
-            <Link
-              href="/auth/signin"
-              className="font-medium text-blue-400 hover:text-blue-300 underline underline-offset-2"
-            >
-              Sign in
-            </Link>
-          </p>
-        </motion.div>
+    <div className="min-h-screen flex flex-col items-center justify-center relative px-4 py-8">
+      {/* Background Effect */}
+      <div className="absolute inset-0 z-0 opacity-30">
+        <MatrixRain
+          color="#3B82F6"
+          fontSize={16}
+          characters="01"
+          speed={0.5}
+          fadeOpacity={0.05}
+          density={1.5}
+        />
       </div>
-    </TechBackground>
+
+      {/* Header with Logo */}
+      <motion.div
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="text-center mb-8 z-10"
+      >
+        <div className="flex items-center justify-center mb-4">
+          <Image
+            src="/images/logo.png"
+            alt="iFreelancer Logo"
+            width={60}
+            height={60}
+            className="rounded-xl"
+          />
+        </div>
+        <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+          Create your account
+        </h1>
+        <p className="text-blue-300 text-lg">
+          Join iFreelancer and start your journey
+        </p>
+      </motion.div>
+
+      {/* Form */}
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+        className="z-10 w-full max-w-md"
+      >
+        <SignUpForm />
+      </motion.div>
+
+      {/* Floating Elements */}
+      <div className="absolute top-1/4 left-1/4 w-24 h-24 bg-blue-500/10 rounded-full filter blur-3xl z-0 animate-pulse"></div>
+      <div className="absolute bottom-1/3 right-1/4 w-32 h-32 bg-indigo-500/10 rounded-full filter blur-3xl z-0 animate-pulse delay-700"></div>
+    </div>
   );
 }

@@ -2,7 +2,7 @@ import { Inter } from "next/font/google";
 import { SessionProvider } from "@/providers/SessionProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { Toaster } from "react-hot-toast";
-import { Navigation } from "@/components/Navigation";
+import { MainNavigation } from "@/components/MainNavigation";
 import { Suspense } from "react";
 import "./globals.css";
 
@@ -15,8 +15,8 @@ export const metadata = {
 
 function LoadingSpinner() {
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-gray-100/50">
-      <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
     </div>
   );
 }
@@ -31,10 +31,8 @@ export default function RootLayout({
       <body className={inter.className}>
         <SessionProvider>
           <QueryProvider>
-            <Suspense fallback={<LoadingSpinner />}>
-              <Navigation />
-              {children}
-            </Suspense>
+            <MainNavigation />
+            <Suspense fallback={<LoadingSpinner />}>{children}</Suspense>
             <Toaster position="top-right" />
           </QueryProvider>
         </SessionProvider>

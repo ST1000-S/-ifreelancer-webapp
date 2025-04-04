@@ -1,9 +1,9 @@
 "use client";
 
-import { useSession, signOut } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { redirect } from "next/navigation";
 import Link from "next/link";
+import { useState, useEffect } from "react";
 
 export default function DashboardLayout({
   children,
@@ -11,33 +11,44 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { data: session, status } = useSession();
-  const router = useRouter();
+  const [activeLink, setActiveLink] = useState("/dashboard");
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/auth/signin");
-    }
-  }, [status, router]);
+    // Set active link based on current path
+    const path = window.location.pathname;
+    setActiveLink(path);
+  }, []);
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex flex-col items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-primary"></div>
+          <p className="mt-4 text-gray-600">Loading your session...</p>
         </div>
       </div>
     );
   }
 
-  const handleSignOut = async () => {
-    await signOut({ redirect: false });
-    router.push("/auth/signin");
+  if (!session) {
+    redirect("/auth/signin?callbackUrl=/dashboard");
+  }
+
+  const isLinkActive = (href: string) => {
+    return activeLink.startsWith(href);
+  };
+
+  const linkClasses = (href: string) => {
+    return `${
+      isLinkActive(href)
+        ? "border-primary text-gray-900 font-semibold"
+        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+    } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors`;
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm">
+      <nav className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex">
@@ -49,7 +60,8 @@ export default function DashboardLayout({
               <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
                 <Link
                   href="/dashboard"
-                  className="border-primary text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                  className={linkClasses("/dashboard")}
+                  onClick={() => setActiveLink("/dashboard")}
                 >
                   Dashboard
                 </Link>
@@ -57,28 +69,45 @@ export default function DashboardLayout({
                   <>
                     <Link
                       href="/dashboard/post-job"
-                      className="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                      className={linkClasses("/dashboard/post-job")}
+                      onClick={() => setActiveLink("/dashboard/post-job")}
                     >
                       Post a Job
                     </Link>
                     <Link
                       href="/dashboard/my-jobs"
-                      className="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                      className={linkClasses("/dashboard/my-jobs")}
+                      onClick={() => setActiveLink("/dashboard/my-jobs")}
                     >
                       My Jobs
+                    </Link>
+                    <Link
+                      href="/dashboard/received-applications"
+                      className={linkClasses(
+                        "/dashboard/received-applications"
+                      )}
+                      onClick={() =>
+                        setActiveLink("/dashboard/received-applications")
+                      }
+                    >
+                      Applications
                     </Link>
                   </>
                 ) : (
                   <>
                     <Link
                       href="/jobs"
-                      className="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                      className={linkClasses("/jobs")}
+                      onClick={() => setActiveLink("/jobs")}
                     >
                       Find Jobs
                     </Link>
                     <Link
                       href="/dashboard/my-applications"
-                      className="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                      className={linkClasses("/dashboard/my-applications")}
+                      onClick={() =>
+                        setActiveLink("/dashboard/my-applications")
+                      }
                     >
                       My Applications
                     </Link>
@@ -86,19 +115,20 @@ export default function DashboardLayout({
                 )}
                 <Link
                   href="/profile"
-                  className="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                  className={linkClasses("/profile")}
+                  onClick={() => setActiveLink("/profile")}
                 >
                   Profile
                 </Link>
               </div>
             </div>
-            <div className="hidden sm:ml-6 sm:flex sm:items-center">
-              <button
-                onClick={handleSignOut}
-                className="text-gray-500 hover:text-gray-700"
+            <div className="flex items-center">
+              <Link
+                href="/auth/signout"
+                className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
               >
                 Sign Out
-              </button>
+              </Link>
             </div>
           </div>
         </div>

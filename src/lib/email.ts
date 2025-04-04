@@ -1,5 +1,5 @@
 import { resend } from "./resend";
-import { logger } from "./logger";
+import { Logger } from "./logger";
 
 interface EmailParams {
   to: string;
@@ -65,7 +65,7 @@ export async function sendApplicationEmail({
         html,
       });
 
-      logger.info("Application email sent successfully", {
+      Logger.info("Application email sent successfully", {
         to,
         type,
         jobTitle,
@@ -83,7 +83,7 @@ export async function sendApplicationEmail({
           error.message.includes("timeout") ||
           error.message.includes("ECONNREFUSED"));
 
-      logger.warn(`Email sending attempt ${attempt} failed`, {
+      Logger.warn(`Email sending attempt ${attempt} failed`, {
         to,
         type,
         jobTitle,
@@ -99,7 +99,7 @@ export async function sendApplicationEmail({
   }
 
   // If we get here, all retries failed
-  logger.error(
+  Logger.error(
     "Failed to send application email after all retries",
     lastError as Error,
     {

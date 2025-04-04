@@ -4,9 +4,29 @@ import { useState } from "react";
 import { JobCard } from "./JobCard";
 import { JobWithCreator } from "@/types/job";
 import { toast } from "react-hot-toast";
-import { JobType, JobCategory } from "@prisma/client";
 import { Button } from "./ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+
+// Import these directly to avoid the issue
+enum JobType {
+  REMOTE = "REMOTE",
+  ONSITE = "ONSITE",
+  HYBRID = "HYBRID",
+}
+
+enum JobCategory {
+  WEB_DEVELOPMENT = "WEB_DEVELOPMENT",
+  MOBILE_DEVELOPMENT = "MOBILE_DEVELOPMENT",
+  UI_UX_DESIGN = "UI_UX_DESIGN",
+  DATA_SCIENCE = "DATA_SCIENCE",
+  MACHINE_LEARNING = "MACHINE_LEARNING",
+  BLOCKCHAIN = "BLOCKCHAIN",
+  DEVOPS = "DEVOPS",
+  QA_TESTING = "QA_TESTING",
+  CYBER_SECURITY = "CYBER_SECURITY",
+  CONTENT_WRITING = "CONTENT_WRITING",
+  OTHER = "OTHER",
+}
 
 interface JobSearchSectionProps {
   initialJobs: JobWithCreator[];
@@ -78,6 +98,18 @@ export function JobSearchSection({
     if (minBudget > maxBudget && maxBudget > 0) {
       throw new Error("Minimum budget cannot be greater than maximum budget");
     }
+  };
+
+  // Helper function to convert JobWithCreator to the format expected by JobCard
+  const formatJobForCard = (job: JobWithCreator, index: number) => {
+    return {
+      job: {
+        ...job,
+        createdAt: job.createdAt.toISOString(),
+        updatedAt: job.updatedAt.toISOString(),
+      },
+      index,
+    };
   };
 
   const handleSearch = async () => {
@@ -198,7 +230,10 @@ export function JobSearchSection({
                 <option key={category} value={category}>
                   {category
                     .split("_")
-                    .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
+                    .map(
+                      (word: string) =>
+                        word.charAt(0) + word.slice(1).toLowerCase()
+                    )
                     .join(" ")}
                 </option>
               ))}
@@ -219,114 +254,113 @@ export function JobSearchSection({
               <option value="181">More than 6 months</option>
             </select>
 
-            <div className="flex gap-2">
-              <input
-                type="number"
-                name="minBudget"
-                placeholder="Min Budget"
-                value={filters.minBudget}
-                onChange={handleFilterChange}
-                className="w-full border rounded-lg p-2 bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                min="0"
-                aria-label="Minimum budget"
-              />
-              <input
-                type="number"
-                name="maxBudget"
-                placeholder="Max Budget"
-                value={filters.maxBudget}
-                onChange={handleFilterChange}
-                className="w-full border rounded-lg p-2 bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                min="0"
-                aria-label="Maximum budget"
-              />
-            </div>
-
-            <input
-              type="text"
-              name="location"
-              placeholder="Location"
-              value={filters.location}
-              onChange={handleFilterChange}
-              className="w-full border rounded-lg p-2 bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-              aria-label="Job location"
-            />
-
-            <input
-              type="text"
-              name="skills"
-              placeholder="Required skills (comma separated)"
-              value={filters.skills}
-              onChange={handleFilterChange}
-              className="w-full border rounded-lg p-2 bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-              aria-label="Required skills"
-            />
-
-            <select
-              name="sortBy"
-              value={filters.sortBy}
-              onChange={handleFilterChange}
-              className="w-full border rounded-lg p-2 bg-gray-700 border-gray-600 text-white"
-              aria-label="Sort by"
+            <button
+              onClick={handleSearch}
+              className="bg-primary text-white font-semibold py-2 px-4 rounded-lg hover:bg-primary/90 transition-colors flex items-center justify-center"
+              disabled={loading}
+              aria-label="Search"
             >
-              <option value="recent">Most Recent</option>
-              <option value="budget_high">Highest Budget</option>
-              <option value="budget_low">Lowest Budget</option>
-              <option value="applications">Most Applications</option>
-            </select>
+              {loading ? "Searching..." : "Search"}
+            </button>
           </div>
         )}
-
-        <Button onClick={handleSearch} disabled={loading} className="w-full">
-          {loading ? "Searching..." : "Search Jobs"}
-        </Button>
       </div>
 
-      {/* Results Section */}
-      <div className="space-y-4">
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-            {error}
+      {error && (
+        <div className="bg-red-900/20 border border-red-700 text-red-200 px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      )}
+
+      {/* Jobs List */}
+      <div className="space-y-6">
+        {jobs.length === 0 ? (
+          <div className="text-center p-8 bg-gray-800 rounded-lg">
+            <h2 className="text-xl font-semibold mb-4">No jobs found</h2>
+            <p className="text-gray-400">
+              Try adjusting your search criteria or check back later for new
+              opportunities.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {jobs.map((job, index) => (
+              <JobCard key={job.id} {...formatJobForCard(job, index)} />
+            ))}
           </div>
         )}
+      </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {jobs.map((job) => (
-            <JobCard key={job.id} job={job} />
-          ))}
-        </div>
-
-        {/* Pagination */}
-        {paginationState.totalPages > 1 && (
-          <div className="flex justify-center items-center gap-2 mt-8">
+      {/* Pagination */}
+      {paginationState.totalPages > 1 && (
+        <div className="flex justify-center mt-8">
+          <div className="flex gap-2">
             <Button
               variant="outline"
               onClick={() => handlePageChange(paginationState.currentPage - 1)}
               disabled={paginationState.currentPage === 1}
+              aria-label="Previous page"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-sm text-gray-400">
-              Page {paginationState.currentPage} of {paginationState.totalPages}
-            </span>
+            <div className="flex gap-1">
+              {Array.from(
+                { length: paginationState.totalPages },
+                (_, i) => i + 1
+              )
+                .filter(
+                  (page) =>
+                    page === 1 ||
+                    page === paginationState.totalPages ||
+                    Math.abs(page - paginationState.currentPage) <= 1
+                )
+                .map((page, i, arr) => {
+                  // Add ellipsis when there are skipped pages
+                  if (i > 0 && page - arr[i - 1] > 1) {
+                    return (
+                      <span
+                        key={`ellipsis-${page}`}
+                        className="px-4 py-2 text-gray-500"
+                      >
+                        ...
+                      </span>
+                    );
+                  }
+                  return (
+                    <Button
+                      key={page}
+                      variant={
+                        page === paginationState.currentPage
+                          ? "default"
+                          : "outline"
+                      }
+                      onClick={() => handlePageChange(page)}
+                      className="min-w-[40px]"
+                      aria-label={`Page ${page}`}
+                      aria-current={
+                        page === paginationState.currentPage
+                          ? "page"
+                          : undefined
+                      }
+                    >
+                      {page}
+                    </Button>
+                  );
+                })}
+            </div>
             <Button
               variant="outline"
               onClick={() => handlePageChange(paginationState.currentPage + 1)}
               disabled={
                 paginationState.currentPage === paginationState.totalPages
               }
+              aria-label="Next page"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-        )}
-
-        {jobs.length === 0 && !loading && (
-          <div className="text-center text-gray-400 py-8">
-            No jobs found. Try adjusting your filters.
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

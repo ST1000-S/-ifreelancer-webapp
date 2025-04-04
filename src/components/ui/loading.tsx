@@ -1,9 +1,18 @@
+import * as React from "react";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Loader2, type LucideProps } from "lucide-react";
 
 interface LoadingProps extends React.HTMLAttributes<HTMLDivElement> {
   size?: "sm" | "default" | "lg";
   text?: string;
+}
+
+interface LoadingPageProps extends LoadingProps {
+  fullScreen?: boolean;
+}
+
+interface LoadingSpinnerProps extends React.SVGAttributes<SVGElement> {
+  size?: "sm" | "default" | "lg";
 }
 
 export function Loading({
@@ -12,12 +21,6 @@ export function Loading({
   className,
   ...props
 }: LoadingProps) {
-  const sizeClasses = {
-    sm: "h-4 w-4",
-    default: "h-6 w-6",
-    lg: "h-8 w-8",
-  };
-
   return (
     <div
       className={cn(
@@ -26,28 +29,26 @@ export function Loading({
       )}
       {...props}
     >
-      <Loader2 className={cn("animate-spin", sizeClasses[size])} />
-      {text && (
-        <p className="text-sm text-muted-foreground animate-pulse">{text}</p>
-      )}
+      <LoadingSpinner size={size} role="status" aria-label="Loading" />
+      {text && <p className="text-sm text-muted-foreground">{text}</p>}
     </div>
   );
 }
 
-interface LoadingPageProps extends LoadingProps {
-  fullScreen?: boolean;
-}
-
 export function LoadingPage({
-  fullScreen = false,
+  fullScreen,
+  className,
   ...props
 }: LoadingPageProps) {
   return (
     <div
       className={cn(
         "flex items-center justify-center",
-        fullScreen ? "min-h-screen" : "min-h-[400px]"
+        fullScreen ? "min-h-screen" : "min-h-[400px]",
+        className
       )}
+      role="region"
+      aria-label="Loading page"
     >
       <Loading size="lg" {...props} />
     </div>
@@ -56,9 +57,23 @@ export function LoadingPage({
 
 export function LoadingSpinner({
   className,
+  size = "sm",
   ...props
-}: Omit<LucideProps, "ref">) {
+}: LoadingSpinnerProps) {
   return (
-    <Loader2 className={cn("h-4 w-4 animate-spin", className)} {...props} />
+    <Loader2
+      className={cn(
+        "animate-spin",
+        {
+          "h-4 w-4": size === "sm",
+          "h-6 w-6": size === "default",
+          "h-8 w-8": size === "lg",
+        },
+        className
+      )}
+      role="status"
+      aria-label="Loading"
+      {...props}
+    />
   );
 }

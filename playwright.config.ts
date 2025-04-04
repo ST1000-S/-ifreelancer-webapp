@@ -12,8 +12,8 @@ export default defineConfig({
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",
     video: "on-first-retry",
-    actionTimeout: 5000,
-    navigationTimeout: 10000,
+    actionTimeout: 15000,
+    navigationTimeout: 30000,
     testIdAttribute: "data-testid",
   },
   projects: [

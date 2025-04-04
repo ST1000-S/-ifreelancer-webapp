@@ -35,9 +35,6 @@ const jobSchema = z.object({
 type WhereClause = Prisma.JobWhereInput;
 type OrderByClause = Prisma.JobOrderByWithRelationInput;
 
-// Cache duration in seconds
-const CACHE_DURATION = 60;
-
 // POST /api/jobs - Create a new job
 export async function POST(req: Request) {
   try {
@@ -230,77 +227,23 @@ export async function GET(req: Request) {
       // Apply pagination manually
       jobs = jobs.slice((page - 1) * limit, page * limit);
     } else {
-      // For regular sorting, use the query as is
+      // Use the standard query
       jobs = await jobsQuery;
     }
 
-    // Get total count for accurate pagination
-    const total = await prisma.job.count({ where });
-    const totalPages = Math.ceil(total / limit);
+    // Get total count for pagination
+    const totalCount = await prisma.job.count({ where });
 
-    // Serialize the job data to ensure it can be safely passed through the API
-    const serializedJobs = jobs.map((job) => ({
-      id: job.id,
-      title: job.title,
-      description: job.description,
-      budget: job.budget,
-      budgetType: job.budgetType,
-      type: job.type,
-      status: job.status,
-      category: job.category,
-      experienceLevel: job.experienceLevel,
-      availability: job.availability,
-      location: job.location || undefined,
-      duration: job.duration ? String(job.duration) : undefined,
-      skills: Array.isArray(job.skills) ? job.skills : [],
-      createdAt:
-        job.createdAt instanceof Date
-          ? job.createdAt.toISOString()
-          : job.createdAt,
-      updatedAt:
-        job.updatedAt instanceof Date
-          ? job.updatedAt.toISOString()
-          : job.updatedAt,
-      creatorId: job.creatorId,
-      creator: {
-        id: job.creator.id,
-        name: job.creator.name || "",
-        email: job.creator.email,
-        image: job.creator.image || undefined,
-      },
-      _count: {
-        applications: job._count.applications,
-      },
-    }));
-
-    logger.info("Jobs fetched successfully", {
-      totalJobs: total,
-      page,
-      limit,
-      filters: Object.keys(where).length - 1, // Subtract the default status filter
-    });
-
-    // Cache the response
-    const response = {
-      jobs: serializedJobs,
-      total,
-      totalPages,
-      currentPage: page,
-    };
-    const responseText = JSON.stringify(response);
-    const newResponse = new NextResponse(responseText, {
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": `public, s-maxage=${CACHE_DURATION}`,
+    // Return formatted results with pagination info
+    return NextResponse.json({
+      jobs,
+      pagination: {
+        total: totalCount,
+        page,
+        limit,
+        totalPages: Math.ceil(totalCount / limit),
       },
     });
-
-    await caches.default.put(
-      `jobs-${JSON.stringify({ where, skip: (page - 1) * limit, limit })}`,
-      newResponse.clone()
-    );
-
-    return newResponse;
   } catch (error) {
     logger.error("Error fetching jobs:", {
       error: error as Error,
@@ -308,16 +251,9 @@ export async function GET(req: Request) {
       name: (error as Error).name,
       message: (error as Error).message,
     });
-    return new NextResponse(
-      JSON.stringify({
-        error: "Internal Server Error",
-      }),
-      {
-        status: 500,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
+    return NextResponse.json(
+      { error: "Failed to fetch jobs", message: (error as Error).message },
+      { status: 500 }
     );
   }
 }

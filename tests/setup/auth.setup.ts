@@ -1,13 +1,18 @@
 import { test as setup } from "@playwright/test";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { UserRole } from "@/lib/auth";
+import { UserRole } from "@prisma/client";
 
 const TEST_USER = {
   email: "test@example.com",
   password: "Test@123",
   name: "Test User",
   role: UserRole.FREELANCER,
+  image: null,
+  emailVerified: null,
+  rating: null,
+  resetToken: null,
+  resetTokenExpires: null,
 };
 
 setup("create test user", async () => {
@@ -24,13 +29,16 @@ setup("create test user", async () => {
       password: hashedPassword,
       name: TEST_USER.name,
       role: TEST_USER.role,
+      image: TEST_USER.image,
+      emailVerified: TEST_USER.emailVerified,
+      rating: TEST_USER.rating,
+      resetToken: TEST_USER.resetToken,
+      resetTokenExpires: TEST_USER.resetTokenExpires,
       profile: {
         create: {
-          skills: [],
-          languages: [],
-          portfolio: {
-            create: [],
-          },
+          title: "Test Profile",
+          bio: "Test bio",
+          hourlyRate: 50,
         },
       },
     },

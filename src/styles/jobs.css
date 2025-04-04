@@ -1,19 +1,19 @@
 /* Job Search Container */
 .job-search-container {
-  @apply container mx-auto px-4 py-8;
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8;
 }
 
 /* Job Search Header */
 .job-search-header {
-  @apply text-center mb-12;
+  @apply text-center mb-8;
 }
 
 .job-search-title {
-  @apply text-4xl font-bold text-white mb-4;
+  @apply text-4xl font-bold text-gray-900 mb-2;
 }
 
 .job-search-description {
-  @apply text-lg text-gray-300;
+  @apply text-lg text-gray-600;
 }
 
 /* Job Search Grid */
@@ -23,19 +23,19 @@
 
 /* Job Filters */
 .job-filters {
-  @apply sticky top-24 space-y-6 bg-white/10 backdrop-blur-lg;
+  @apply sticky top-24 bg-white rounded-lg shadow-lg;
 }
 
 .job-filter-section {
-  @apply space-y-4;
+  @apply space-y-6;
 }
 
 .job-filter-title {
-  @apply text-xl font-semibold flex items-center gap-2 text-white mb-4;
+  @apply text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4;
 }
 
 .job-filter-icon {
-  @apply text-blue-400;
+  @apply text-primary;
 }
 
 /* Job Search Form */
@@ -104,7 +104,7 @@
 }
 
 .job-card {
-  @apply bg-white/10 backdrop-blur-lg rounded-lg p-6 mb-4 hover:bg-white/20 transition-all duration-200;
+  @apply bg-white rounded-lg shadow-lg p-6 transition-all hover:shadow-xl;
 }
 
 .job-card-header {
@@ -112,27 +112,95 @@
 }
 
 .job-card-title {
-  @apply text-xl font-semibold text-white hover:text-blue-400 transition-colors;
+  @apply text-xl font-semibold text-gray-900 hover:text-primary transition-colors;
 }
 
 .job-card-budget {
-  @apply text-green-400 font-semibold;
+  @apply text-lg font-medium text-primary;
 }
 
 .job-card-description {
-  @apply text-gray-300 mb-4;
+  @apply text-gray-600 mb-4;
+}
+
+.job-card-footer {
+  @apply flex flex-wrap items-center gap-4;
 }
 
 .job-card-meta {
-  @apply flex flex-wrap gap-4 text-sm text-gray-400;
+  @apply flex items-center gap-2 text-sm text-gray-500;
 }
 
 .job-card-skills {
-  @apply flex flex-wrap gap-2 mt-4;
+  @apply flex flex-wrap gap-2;
 }
 
-.job-skill-badge {
-  @apply bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full text-xs;
+.skill-badge {
+  @apply px-3 py-1 rounded-full text-sm font-medium bg-primary/10 text-primary;
+}
+
+.search-form {
+  @apply flex gap-4 mb-8;
+}
+
+.search-input {
+  @apply flex-1;
+}
+
+.budget-range {
+  @apply mt-4;
+}
+
+.budget-labels {
+  @apply flex justify-between text-sm text-gray-600 mt-2;
+}
+
+.duration-options {
+  @apply space-y-3;
+}
+
+.duration-option {
+  @apply flex items-center gap-2;
+}
+
+.skills-grid {
+  @apply grid grid-cols-2 gap-2;
+}
+
+.skill-checkbox {
+  @apply flex items-center gap-2;
+}
+
+.show-more-button {
+  @apply text-primary hover:text-primary/80 text-sm mt-2;
+}
+
+.loading-skeleton {
+  @apply animate-pulse bg-gray-200 rounded;
+}
+
+.job-card-skeleton {
+  @apply space-y-4;
+}
+
+.skeleton-title {
+  @apply h-6 w-3/4;
+}
+
+.skeleton-description {
+  @apply h-4 w-full;
+}
+
+.skeleton-meta {
+  @apply h-4 w-1/4;
+}
+
+.error-message {
+  @apply text-red-500 text-sm mt-1;
+}
+
+.no-results {
+  @apply text-center text-gray-600 py-8;
 }
 
 /* Loading State */

@@ -1,108 +1,160 @@
+import { jest } from "@jest/globals";
 import { sendApplicationEmail } from "../email";
-import { resend } from "../resend";
-import { logger } from "../logger";
+import { logger as Logger } from "../logger-impl";
 
-// Mock resend
-jest.mock("../resend", () => ({
-  resend: {
-    emails: {
-      send: jest.fn(),
-    },
-  },
-}));
-
-// Mock logger
-jest.mock("../logger", () => ({
+// Mock the logger
+jest.mock("../logger-impl", () => ({
   logger: {
     info: jest.fn(),
-    error: jest.fn(),
     warn: jest.fn(),
+    error: jest.fn(),
   },
 }));
 
-describe("Email Service", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
+// Mock the resend module
+const mockSend = jest.fn();
+const mockResend = {
+  emails: {
+    send: mockSend,
+  },
+};
 
-  const validEmailParams = {
+// Mock the resend module and prevent test email initialization
+jest.mock("../resend", () => {
+  // Mock the test email initialization
+  mockSend.mockResolvedValueOnce(undefined);
+
+  return {
+    resend: mockResend,
+    __esModule: true,
+    default: mockResend,
+  };
+});
+
+// Mock process.env
+process.env.RESEND_API_KEY = "test-api-key";
+
+interface SendEmailResponse {
+  id: string;
+}
+
+interface SendEmailParams {
+  from: string;
+  to: string[];
+  subject: string;
+  html: string;
+}
+
+describe("Email Service", () => {
+  const validParams = {
     to: "test@example.com",
-    jobTitle: "Test Job",
-    applicantName: "Test Applicant",
-    type: "applicant" as const,
+    jobTitle: "Software Engineer",
+    applicantName: "John Doe",
+    type: "creator" as const,
   };
 
-  test("should send email successfully", async () => {
-    (resend.emails.send as jest.Mock).mockResolvedValueOnce({ id: "test-id" });
+  const networkError = new Error("Network error");
 
-    await sendApplicationEmail(validEmailParams);
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSend.mockReset();
+    mockSend.mockResolvedValue(undefined);
+  });
 
-    expect(resend.emails.send).toHaveBeenCalledTimes(1);
-    expect(logger.info).toHaveBeenCalledWith(
+  it("should send application email successfully", async () => {
+    await sendApplicationEmail(validParams);
+
+    expect(mockSend).toHaveBeenCalledWith({
+      from: "iFreelancer <no-reply@ifreelancer.com>",
+      to: [validParams.to],
+      subject: "New application received",
+      html: expect.stringContaining(validParams.applicantName),
+    });
+
+    expect(Logger.info).toHaveBeenCalledWith(
       "Application email sent successfully",
-      expect.any(Object)
-    );
-  });
-
-  test("should retry on failure", async () => {
-    (resend.emails.send as jest.Mock)
-      .mockRejectedValueOnce(new Error("Network error"))
-      .mockRejectedValueOnce(new Error("Network error"))
-      .mockResolvedValueOnce({ id: "test-id" });
-
-    await sendApplicationEmail(validEmailParams);
-
-    expect(resend.emails.send).toHaveBeenCalledTimes(3);
-    expect(logger.warn).toHaveBeenCalledTimes(2);
-    expect(logger.info).toHaveBeenCalledTimes(1);
-  });
-
-  test("should throw error after max retries", async () => {
-    const error = new Error("Network error");
-    (resend.emails.send as jest.Mock).mockRejectedValue(error);
-
-    await expect(sendApplicationEmail(validEmailParams)).rejects.toThrow();
-    expect(resend.emails.send).toHaveBeenCalledTimes(3);
-    expect(logger.error).toHaveBeenCalledWith(
-      "Failed to send application email after all retries",
-      error,
-      expect.any(Object)
-    );
-  });
-
-  test("should validate email format", async () => {
-    await expect(
-      sendApplicationEmail({
-        ...validEmailParams,
-        to: "invalid-email",
+      expect.objectContaining({
+        to: validParams.to,
+        type: validParams.type,
+        jobTitle: validParams.jobTitle,
+        attempt: 1,
       })
-    ).rejects.toThrow("Invalid email address format");
-
-    expect(resend.emails.send).not.toHaveBeenCalled();
+    );
   });
 
-  test("should format email content based on type", async () => {
-    (resend.emails.send as jest.Mock).mockResolvedValueOnce({ id: "test-id" });
+  it("should retry on network error", async () => {
+    mockSend
+      .mockRejectedValueOnce(networkError)
+      .mockResolvedValueOnce(undefined);
 
-    // Test applicant email
-    await sendApplicationEmail(validEmailParams);
-    expect(resend.emails.send).toHaveBeenCalledWith(
+    await sendApplicationEmail(validParams);
+
+    expect(mockSend).toHaveBeenCalledTimes(2);
+    expect(Logger.warn).toHaveBeenCalledWith(
+      "Email sending attempt 1 failed",
+      expect.objectContaining({
+        error: networkError.message,
+        isNetworkError: true,
+      })
+    );
+  });
+
+  it("should throw error after max retries", async () => {
+    mockSend
+      .mockRejectedValueOnce(networkError)
+      .mockRejectedValueOnce(networkError)
+      .mockRejectedValueOnce(networkError);
+
+    await expect(sendApplicationEmail(validParams)).rejects.toThrow(
+      "Failed to send email after 3 attempts"
+    );
+
+    expect(Logger.error).toHaveBeenCalledWith(
+      "Failed to send application email after all retries",
+      networkError,
+      expect.objectContaining({
+        attempts: 3,
+      })
+    );
+  });
+
+  it("should format creator email content", async () => {
+    await sendApplicationEmail(validParams);
+
+    expect(mockSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: "New application received",
+        html: expect.stringContaining("has applied for your job posting"),
+      })
+    );
+  });
+
+  it("should format applicant email content", async () => {
+    const applicantParams = {
+      ...validParams,
+      type: "applicant" as const,
+    };
+
+    await sendApplicationEmail(applicantParams);
+
+    expect(mockSend).toHaveBeenCalledWith(
       expect.objectContaining({
         subject: "Your job application has been submitted",
         html: expect.stringContaining("Application Submitted"),
       })
     );
+  });
 
-    // Test creator email
-    await sendApplicationEmail({
-      ...validEmailParams,
-      type: "creator" as const,
-    });
-    expect(resend.emails.send).toHaveBeenCalledWith(
-      expect.objectContaining({
-        subject: "New application received",
-        html: expect.stringContaining("New Application Received"),
-      })
+  it("should validate email format", async () => {
+    const invalidParams = {
+      ...validParams,
+      to: "invalid-email",
+    };
+
+    await expect(sendApplicationEmail(invalidParams)).rejects.toThrow(
+      "Invalid email address format"
     );
+
+    expect(mockSend).not.toHaveBeenCalled();
   });
 });

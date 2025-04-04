@@ -8,55 +8,24 @@ const globalForPrisma = global as unknown as { prisma: PrismaClient };
 export const prisma =
   globalForPrisma.prisma ||
   new PrismaClient({
-    log: [
-      {
-        emit: "event",
-        level: "query",
-      },
-      {
-        emit: "event",
-        level: "error",
-      },
-      {
-        emit: "event",
-        level: "info",
-      },
-      {
-        emit: "event",
-        level: "warn",
-      },
-    ],
-    datasources: {
-      db: {
-        url: process.env.DATABASE_URL,
-      },
-    },
-    // Configure connection pooling
-    connection: {
-      pool: {
-        min: 2,
-        max: 10,
-        idleTimeoutMillis: 30000,
-        acquireTimeoutMillis: 30000,
-      },
-    },
+    log: ["query", "error", "warn"],
   });
 
 // Logging middleware
-prisma.$on("query", (e: any) => {
+prisma.$on("query", (e: Prisma.QueryEvent) => {
   logger.debug("Query: " + e.query);
   logger.debug("Duration: " + e.duration + "ms");
 });
 
-prisma.$on("error", (e: any) => {
+prisma.$on("error", (e: Prisma.LogEvent) => {
   logger.error("Prisma Error: " + e.message);
 });
 
-prisma.$on("info", (e: any) => {
+prisma.$on("info", (e: Prisma.LogEvent) => {
   logger.info("Prisma Info: " + e.message);
 });
 
-prisma.$on("warn", (e: any) => {
+prisma.$on("warn", (e: Prisma.LogEvent) => {
   logger.warn("Prisma Warning: " + e.message);
 });
 

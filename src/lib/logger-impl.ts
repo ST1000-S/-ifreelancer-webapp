@@ -1,24 +1,24 @@
-import type {
-  LogLevel,
-  LogEntry,
-  LoggerError,
-  LoggerMetadata,
-  ILogger,
-} from "./logger";
+import type { LogLevel, LogEntry, LogContext, LoggerService } from "./logger";
 
-class LoggerImpl implements ILogger {
+export class LoggerImpl implements LoggerService {
   private static instance: LoggerImpl;
-  private logs: LogEntry[] = [];
-  private readonly maxLogs = 1000;
-  private readonly maxMessageLength = 10000; // Prevent memory issues from huge messages
+  private maxMessageLength = 10000;
+  private truncationSuffix = "... (truncated)";
+  private logs: Record<LogLevel, LogEntry[]> = {
+    debug: [],
+    info: [],
+    warn: [],
+    error: [],
+  };
 
   private constructor() {
-    // Set up error handling for uncaught exceptions
-    process.on("uncaughtException", (error) => {
+    // Handle uncaught exceptions
+    process.on("uncaughtException", (error: Error) => {
       this.error("Uncaught Exception", error);
     });
 
-    process.on("unhandledRejection", (reason) => {
+    // Handle unhandled promise rejections
+    process.on("unhandledRejection", (reason: unknown) => {
       this.error(
         "Unhandled Promise Rejection",
         reason instanceof Error ? reason : new Error(String(reason))
@@ -26,7 +26,7 @@ class LoggerImpl implements ILogger {
     });
   }
 
-  static getInstance(): LoggerImpl {
+  public static getInstance(): LoggerImpl {
     if (!LoggerImpl.instance) {
       LoggerImpl.instance = new LoggerImpl();
     }
@@ -34,124 +34,123 @@ class LoggerImpl implements ILogger {
   }
 
   private sanitizeMessage(message: string): string {
-    // Truncate long messages
-    if (message.length > this.maxMessageLength) {
-      return (
-        message.substring(0, this.maxMessageLength - 100) + "... (truncated)"
-      );
+    if (message.length <= this.maxMessageLength) {
+      return message;
     }
-    return message;
-  }
-
-  private sanitizeContext(
-    context?: Record<string, unknown>
-  ): Record<string, unknown> | undefined {
-    if (!context) return undefined;
-
-    const sanitized: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(context)) {
-      // Skip null or undefined values
-      if (value == null) continue;
-
-      // Handle circular references and complex objects
-      try {
-        JSON.stringify(value);
-        sanitized[key] = value;
-      } catch (error) {
-        if (typeof value === "object" && value !== null) {
-          const circularRef = value as Record<string, unknown>;
-          if (circularRef === context) {
-            sanitized[key] = "[Circular]";
-          } else {
-            sanitized[key] = "[Complex Object]";
-          }
-        } else {
-          sanitized[key] = String(value);
-        }
-      }
-    }
-    return sanitized;
-  }
-
-  private formatError(error: Error): LogEntry["error"] {
-    return {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      cause: error.cause,
-    };
-  }
-
-  private log(
-    level: LogLevel,
-    message: string,
-    metadata?: LoggerMetadata,
-    error?: Error
-  ) {
-    const timestamp = new Date().toISOString();
-    const sanitizedMessage = this.sanitizeMessage(message);
-    const sanitizedMetadata = this.sanitizeContext(metadata);
-
-    const logEntry: LogEntry = {
-      timestamp,
-      level,
-      message: sanitizedMessage,
-      context: sanitizedMetadata,
-      ...(error && { error: this.formatError(error) }),
-    };
-
-    // Add to logs array
-    this.logs.push(logEntry);
-    if (this.logs.length > this.maxLogs) {
-      this.logs = this.logs.slice(-this.maxLogs);
-    }
-
-    // Also log to console
-    console.log(JSON.stringify(logEntry));
-  }
-
-  info(message: string, metadata?: LoggerMetadata): void {
-    this.log("info", message, metadata);
-  }
-
-  warn(message: string, metadata?: LoggerMetadata): void {
-    this.log("warn", message, metadata);
-  }
-
-  error(
-    message: string,
-    error: Error | LoggerError,
-    metadata?: LoggerMetadata
-  ): void {
-    this.log(
-      "error",
-      message,
-      metadata,
-      error instanceof Error ? error : new Error(error.message)
+    return (
+      message.substring(
+        0,
+        this.maxMessageLength - this.truncationSuffix.length
+      ) + this.truncationSuffix
     );
   }
 
-  debug(message: string, metadata?: LoggerMetadata): void {
-    this.log("debug", message, metadata);
+  private sanitizeContext(context: LogContext): LogContext {
+    const seen = new WeakSet();
+    const sanitize = (obj: unknown): unknown => {
+      if (obj === null || typeof obj !== "object") {
+        return obj;
+      }
+
+      if (obj instanceof Object && seen.has(obj)) {
+        return "[Circular]";
+      }
+      if (obj instanceof Object) {
+        seen.add(obj);
+      }
+
+      if (obj instanceof Error) {
+        return {
+          name: obj.name,
+          message: obj.message,
+          stack: obj.stack,
+        };
+      }
+
+      if (Array.isArray(obj)) {
+        return obj.map((item) => sanitize(item));
+      }
+
+      if (obj instanceof Object) {
+        const sanitized: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(obj)) {
+          sanitized[key] = sanitize(value);
+        }
+        return sanitized;
+      }
+
+      return obj;
+    };
+
+    return sanitize(context) as LogContext;
   }
 
-  getLogs(level?: LogLevel, limit = 100): LogEntry[] {
-    let filteredLogs = this.logs;
-    if (level) {
-      filteredLogs = this.logs.filter((log) => log.level === level);
+  log(level: LogLevel, message: string, context?: LogContext): void {
+    const sanitizedMessage = this.sanitizeMessage(message);
+    const sanitizedContext = context
+      ? this.sanitizeContext(context)
+      : undefined;
+
+    const entry: LogEntry = {
+      timestamp: new Date(),
+      level,
+      message: sanitizedMessage,
+      context: sanitizedContext,
+    };
+
+    this.logs[level].push(entry);
+
+    // Log to console for development
+    const consoleMessage = `[${entry.timestamp.toISOString()}] ${level.toUpperCase()}: ${sanitizedMessage}`;
+    if (sanitizedContext) {
+      console.log(consoleMessage, sanitizedContext);
+    } else {
+      console.log(consoleMessage);
     }
-    return filteredLogs.slice(0, Math.min(limit, this.maxLogs));
+  }
+
+  debug(message: string, context?: LogContext): void {
+    this.log("debug", message, context);
+  }
+
+  info(message: string, context?: LogContext): void {
+    this.log("info", message, context);
+  }
+
+  warn(message: string, context?: LogContext): void {
+    this.log("warn", message, context);
+  }
+
+  error(message: string, error?: Error, context?: LogContext): void {
+    const errorContext = error
+      ? {
+          ...context,
+          error: {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+          },
+        }
+      : context;
+    this.log("error", message, errorContext);
+  }
+
+  getLogs(level?: LogLevel): LogEntry[] {
+    if (level) {
+      return [...this.logs[level]];
+    }
+    return Object.values(this.logs).flat();
   }
 
   clearLogs() {
-    this.logs = [];
+    Object.keys(this.logs).forEach((level) => {
+      this.logs[level as LogLevel] = [];
+    });
   }
 
-  // Export logs to JSON for external processing
-  exportLogs(level?: LogLevel): string {
-    const logs = this.getLogs(level);
-    return JSON.stringify(logs, null, 2);
+  exportLogs(): Record<LogLevel, LogEntry[]> {
+    return { ...this.logs };
   }
 }
 
-export const logger: ILogger = LoggerImpl.getInstance();
+export const logger = LoggerImpl.getInstance();

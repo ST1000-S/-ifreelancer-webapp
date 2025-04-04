@@ -11,18 +11,61 @@ datasource db {
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
+enum UserRole {
+  FREELANCER
+  CLIENT
+  ADMIN
+}
+
+enum ApplicationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum JobStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum JobType {
+  FIXED
+  HOURLY
+  REMOTE
+  ONSITE
+  HYBRID
+}
+
+enum JobDuration {
+  LESS_THAN_1_MONTH
+  ONE_TO_THREE_MONTHS
+  THREE_TO_SIX_MONTHS
+  MORE_THAN_6_MONTHS
+}
+
+enum JobAvailability {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  FREELANCE
+  FLEXIBLE
+}
+
 model Account {
   id                String  @id @default(cuid())
   userId            String
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String?
-  access_token      String?
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String?
+  id_token          String? @db.Text
   session_state     String?
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -34,78 +77,64 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  user         User     @relation("UserSessions", fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model User {
-  id            String           @id @default(cuid())
-  name          String?
-  email         String          @unique
-  emailVerified DateTime?
-  image         String?
-  password      String
-  role          UserRole        @default(FREELANCER)
-  rating        Float?
-  resetToken    String?
+  id                String           @id @default(cuid())
+  name              String?
+  email             String?          @unique
+  emailVerified     DateTime?
+  image             String?
+  password          String?
+  role              UserRole         @default(FREELANCER)
+  rating            Float?
+  resetToken        String?
   resetTokenExpires DateTime?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  profile       Profile?
-  accounts      Account[]
-  sessions      Session[]       @relation("UserSessions")
-  jobs          Job[]           @relation("CreatedJobs")
-  applications  JobApplication[] @relation("Applicant")
-  reviewsGiven  Review[]        @relation("ReviewsGiven")
-  reviewsReceived Review[]      @relation("ReviewsReceived")
+  accounts          Account[]
+  sessions          Session[]
+  profile           Profile?
+  createdJobs       Job[]           @relation("CreatedJobs")
+  applications      Application[]   @relation("UserApplications")
+  reviewsGiven      Review[]        @relation("ReviewsGiven")
+  reviewsReceived   Review[]        @relation("ReviewsReceived")
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   @@map("users")
 }
 
 model Profile {
-  id            String           @id @default(cuid())
-  userId        String           @unique
-  bio           String?
-  skills        String[]         @default([])
-  hourlyRate    Float?
-  location      String?
-  website       String?
-  github        String?
-  linkedin      String?
-  title         String?
-  availability  Boolean          @default(true)
-  languages     String[]         @default([])
-  phoneNumber   String?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  portfolio     Portfolio[]
-  experience    WorkExperience[]
-  education     Education[]
+  id             String           @id @default(cuid())
+  userId         String           @unique
+  title          String?
+  bio            String?          @db.Text
+  image          String?
+  rating         Float?
+  hourlyRate     Float?
+  availability   JobAvailability?
+  skills         Skill[]
+  portfolios     Portfolio[]
+  workExperience WorkExperience[]
+  education      Education[]
   certifications Certification[]
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
-  @@index([skills])
-  @@index([languages])
-  @@index([hourlyRate])
-  @@index([location])
-  @@index([availability])
-  @@fulltext([bio, title])
+  @@index([userId])
 }
 
 model Portfolio {
   id          String   @id @default(cuid())
-  profileId   String
   title       String
-  description String
-  imageUrl    String?
-  projectUrl  String?
-  skills      String[]
-  startDate   DateTime
-  endDate     DateTime?
+  description String?  @db.Text
+  link        String?
+  image       String?
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
-
-  @@index([skills])
 }
 
 model WorkExperience {
@@ -154,38 +183,6 @@ model Certification {
   profile      Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
 }
 
-enum UserRole {
-  FREELANCER
-  CLIENT
-  ADMIN
-}
-
-enum JobType {
-  REMOTE
-  ONSITE
-  HYBRID
-}
-
-enum JobStatus {
-  OPEN
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
-
-enum ApplicationStatus {
-  PENDING
-  ACCEPTED
-  REJECTED
-  WITHDRAWN
-}
-
-enum ExperienceLevel {
-  BEGINNER
-  INTERMEDIATE
-  EXPERT
-}
-
 enum JobCategory {
   WEB_DEVELOPMENT
   MOBILE_DEVELOPMENT
@@ -200,51 +197,41 @@ enum JobCategory {
 model Job {
   id            String           @id @default(cuid())
   title         String
-  description   String
-  budget        Float
-  budgetType    String          @default("FIXED")
+  description   String          @db.Text
   type          JobType
-  status        JobStatus        @default(OPEN)
-  category      JobCategory
-  experienceLevel String         @default("BEGINNER")
-  availability  String          @default("FULL_TIME")
+  budget        Int
+  category      String
   location      String?
-  duration      Int?             // Duration in days
-  skills        String[]
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  duration      JobDuration
+  skills        Skill[]
+  status        JobStatus       @default(OPEN)
   creatorId     String
-  creator       User             @relation("CreatedJobs", fields: [creatorId], references: [id])
-  applications  JobApplication[] @relation("JobApplications")
-  reviews       Review[]         @relation("JobReviews")
+  creator       User            @relation("CreatedJobs", fields: [creatorId], references: [id], onDelete: Cascade)
+  applications  Application[]   @relation("JobApplications")
+  reviews       Review[]        @relation("JobReviews")
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
   @@index([creatorId])
-  @@index([status])
-  @@index([type])
-  @@index([category])
-  @@index([skills])
-  @@index([createdAt])
-  @@index([budget])
-  @@index([experienceLevel])
-  @@index([availability])
-  @@fulltext([title, description])
+  @@index([title])
+  @@index([description])
 }
 
-model JobApplication {
-  id          String    @id @default(cuid())
-  status      ApplicationStatus @default(PENDING)
-  coverLetter String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  applicantId String
+model Application {
+  id          String            @id @default(cuid())
   jobId       String
-  applicant   User      @relation("Applicant", fields: [applicantId], references: [id])
-  job         Job       @relation("JobApplications", fields: [jobId], references: [id])
+  applicantId String
+  status      ApplicationStatus @default(PENDING)
+  coverLetter String?          @db.Text
+  proposal    Int
+  job         Job              @relation("JobApplications", fields: [jobId], references: [id], onDelete: Cascade)
+  applicant   User             @relation("UserApplications", fields: [applicantId], references: [id], onDelete: Cascade)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
-  @@index([applicantId])
+  @@unique([jobId, applicantId])
   @@index([jobId])
-  @@index([status])
-  @@index([createdAt])
+  @@index([applicantId])
 }
 
 model Review {
@@ -265,15 +252,19 @@ model Review {
   @@index([revieweeId])
 }
 
-enum JobDuration {
-  LESS_THAN_1_MONTH
-  ONE_TO_THREE_MONTHS
-  THREE_TO_SIX_MONTHS
-  MORE_THAN_6_MONTHS
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
-enum JobAvailability {
-  FULL_TIME
-  PART_TIME
-  FLEXIBLE
+model Skill {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  profiles  Profile[]
+  jobs      Job[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }

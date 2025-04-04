@@ -1,125 +1,77 @@
 import { NextResponse } from "next/server";
-import { logger } from "./logger";
-
-interface RateLimitRecord {
-  count: number;
-  resetTime: number;
-  firstAttempt: number;
-}
+import { logger as Logger } from "./logger-impl";
+import { generateRateLimitKey } from "./security";
 
 interface RateLimitStore {
-  [key: string]: RateLimitRecord;
+  [key: string]: {
+    count: number;
+    resetTime: number;
+  };
 }
 
 const store: RateLimitStore = {};
-const MAX_STORE_SIZE = 10000; // Maximum number of records to prevent memory leaks
+const WINDOW_MS = 60 * 1000; // 1 minute
+const MAX_REQUESTS = 60; // 60 requests per minute
 
-function cleanStore() {
+export function rateLimit(key: string): boolean {
   const now = Date.now();
-  const entries = Object.entries(store);
 
-  // Remove expired entries
-  for (const [key, value] of entries) {
-    if (value.resetTime < now) {
-      delete store[key];
-    }
-  }
-
-  // If still too many entries, remove oldest based on firstAttempt
-  if (Object.keys(store).length > MAX_STORE_SIZE) {
-    const sortedEntries = entries.sort(
-      (a, b) => a[1].firstAttempt - b[1].firstAttempt
-    );
-    const entriesToRemove = sortedEntries.slice(
-      0,
-      sortedEntries.length - MAX_STORE_SIZE
-    );
-    for (const [key] of entriesToRemove) {
-      delete store[key];
-    }
-  }
-}
-
-export function rateLimit(
-  key: string,
-  limit: number = 10,
-  windowMs: number = 60000
-): boolean {
-  const now = Date.now();
-  const record = store[key];
-
-  // Clean up expired records first
-  if (record && now > record.resetTime) {
-    delete store[key];
-  }
-
-  // If no record or record was expired, create new one
-  if (!store[key]) {
+  // Initialize or reset if window has passed
+  if (!store[key] || now > store[key].resetTime) {
     store[key] = {
       count: 1,
-      resetTime: now + windowMs,
-      firstAttempt: now,
+      resetTime: now + WINDOW_MS,
     };
     return true;
   }
 
-  // Check if we've hit the limit
-  if (store[key].count >= limit) {
-    // Log rate limit exceeded
-    logger.warn("Rate limit exceeded", {
-      key,
-      count: store[key].count,
-      resetTime: new Date(store[key].resetTime).toISOString(),
-    });
-    return false;
+  // Increment count if within window
+  if (store[key].count < MAX_REQUESTS) {
+    store[key].count++;
+    return true;
   }
 
-  // Increment count
-  store[key].count++;
-  return true;
+  return false;
 }
 
-export function rateLimitMiddleware(
-  req: Request,
-  limit: number = 10,
-  windowMs: number = 60000
-) {
-  // Get IP from various headers
-  const forwardedFor = req.headers.get("x-forwarded-for");
-  const realIp = req.headers.get("x-real-ip");
-  const ip = forwardedFor?.split(",")[0].trim() || realIp || "unknown";
+export function rateLimitMiddleware(request: Request): NextResponse {
+  try {
+    const ip = request.headers.get("x-forwarded-for") || "unknown";
+    const key = generateRateLimitKey(ip, request.url);
+    const isAllowed = rateLimit(key);
+    const headers = new Headers();
 
-  // Create a unique key combining IP and route
-  const url = new URL(req.url);
-  const route = url.pathname;
-  const key = `${ip}:${route}`;
+    // Set rate limit headers
+    const remaining = isAllowed ? MAX_REQUESTS - (store[key]?.count || 0) : 0;
+    const reset = store[key]?.resetTime || Date.now() + WINDOW_MS;
 
-  if (!rateLimit(key, limit, windowMs)) {
-    logger.warn("Rate limit exceeded for request", {
-      ip,
-      route,
-      limit,
-      windowMs,
+    headers.set("X-RateLimit-Limit", String(MAX_REQUESTS));
+    headers.set("X-RateLimit-Remaining", String(remaining));
+    headers.set("X-RateLimit-Reset", String(Math.ceil(reset / 1000))); // Convert to seconds
+
+    if (!isAllowed) {
+      headers.set(
+        "Retry-After",
+        String(Math.ceil((reset - Date.now()) / 1000))
+      );
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429, headers }
+      );
+    }
+
+    const response = NextResponse.next();
+    // Copy rate limit headers to response
+    headers.forEach((value, key) => {
+      response.headers.set(key, value);
     });
 
-    return NextResponse.json(
-      {
-        error: "Too many requests",
-        retryAfter: Math.ceil((store[key].resetTime - Date.now()) / 1000),
-      },
-      {
-        status: 429,
-        headers: {
-          "Retry-After": Math.ceil(
-            (store[key].resetTime - Date.now()) / 1000
-          ).toString(),
-        },
-      }
+    return response;
+  } catch (error) {
+    Logger.error(
+      "Rate limit error:",
+      error instanceof Error ? error : new Error(String(error))
     );
+    return NextResponse.next();
   }
-
-  return null;
 }
-
-// Clean up old records every minute
-setInterval(cleanStore, 60000);

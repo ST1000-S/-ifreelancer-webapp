@@ -2,41 +2,35 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ["avatars.githubusercontent.com", "lh3.googleusercontent.com"],
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
+    domains: ["images.unsplash.com", "via.placeholder.com"],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
   experimental: {
     optimizeCss: true,
-    optimizePackageImports: [
-      "@radix-ui/react-icons",
-      "@heroicons/react",
-      "lucide-react",
-    ],
-    serverActions: true,
+    optimizePackageImports: ["@mui/icons-material", "@mui/material"],
   },
-  compiler: {
-    removeConsole: process.env.NODE_ENV === "production",
-  },
-  webpack: (config, { dev, isServer }) => {
-    // Optimize CSS
-    if (!dev && !isServer) {
-      config.optimization.splitChunks.cacheGroups.styles = {
-        name: "styles",
-        test: /\.(css|scss)$/,
-        chunks: "all",
-        enforce: true,
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        crypto: require.resolve("crypto-browserify"),
+        stream: require.resolve("stream-browserify"),
+        util: require.resolve("util"),
+        zlib: require.resolve("browserify-zlib"),
+        http: require.resolve("stream-http"),
+        https: require.resolve("https-browserify"),
+        url: require.resolve("url"),
+        assert: require.resolve("assert"),
+        net: false,
+        tls: false,
       };
     }
-
     return config;
   },
-  // Enable response compression
   compress: true,
-  // Increase static generation concurrency
   staticPageGenerationTimeout: 120,
-  // Add custom headers for security
-  async headers() {
+  headers: async () => {
     return [
       {
         source: "/:path*",
@@ -46,8 +40,8 @@ const nextConfig = {
             value: "on",
           },
           {
-            key: "X-XSS-Protection",
-            value: "1; mode=block",
+            key: "Strict-Transport-Security",
+            value: "max-age=31536000; includeSubDomains",
           },
           {
             key: "X-Frame-Options",
@@ -58,8 +52,12 @@ const nextConfig = {
             value: "nosniff",
           },
           {
+            key: "X-XSS-Protection",
+            value: "1; mode=block",
+          },
+          {
             key: "Referrer-Policy",
-            value: "strict-origin-when-cross-origin",
+            value: "same-origin",
           },
         ],
       },

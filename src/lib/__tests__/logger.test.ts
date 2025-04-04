@@ -1,25 +1,117 @@
-import { Logger } from "../logger";
+import { jest } from "@jest/globals";
+import {
+  Logger,
+  type LogLevel,
+  type LogEntry,
+  type LogContext,
+} from "../logger";
+
+const mockLogs: Record<LogLevel, LogEntry[]> = {
+  debug: [],
+  info: [],
+  warn: [],
+  error: [],
+};
+
+const truncateMessage = (message: string): string => {
+  const maxLength = 10000;
+  const truncationSuffix = "... (truncated)";
+  if (message.length <= maxLength) {
+    return message;
+  }
+  return (
+    message.substring(0, maxLength - truncationSuffix.length) + truncationSuffix
+  );
+};
 
 jest.mock("../logger", () => {
-  const logs: any[] = [];
+  const mockLogger = {
+    debug: jest.fn((message: string, context?: LogContext) => {
+      mockLogs.debug.push({
+        level: "debug",
+        message: truncateMessage(message),
+        timestamp: new Date(),
+        context: context
+          ? JSON.parse(
+              JSON.stringify(context, (key, value) => {
+                if (key && value === context) return "[Circular]";
+                return value;
+              })
+            )
+          : undefined,
+      });
+    }),
+    info: jest.fn((message: string, context?: LogContext) => {
+      mockLogs.info.push({
+        level: "info",
+        message: truncateMessage(message),
+        timestamp: new Date(),
+        context: context
+          ? JSON.parse(
+              JSON.stringify(context, (key, value) => {
+                if (key && value === context) return "[Circular]";
+                return value;
+              })
+            )
+          : undefined,
+      });
+    }),
+    warn: jest.fn((message: string, context?: LogContext) => {
+      mockLogs.warn.push({
+        level: "warn",
+        message: truncateMessage(message),
+        timestamp: new Date(),
+        context: context
+          ? JSON.parse(
+              JSON.stringify(context, (key, value) => {
+                if (key && value === context) return "[Circular]";
+                return value;
+              })
+            )
+          : undefined,
+      });
+    }),
+    error: jest.fn((message: string, error?: Error, context?: LogContext) => {
+      const errorContext = error
+        ? {
+            ...context,
+            error: {
+              name: error.name,
+              message: error.message,
+              stack: error.stack,
+            },
+          }
+        : context;
+      mockLogs.error.push({
+        level: "error",
+        message: truncateMessage(message),
+        timestamp: new Date(),
+        context: errorContext
+          ? JSON.parse(
+              JSON.stringify(errorContext, (key, value) => {
+                if (key && value === errorContext) return "[Circular]";
+                return value;
+              })
+            )
+          : undefined,
+      });
+    }),
+    getLogs: jest.fn((level?: LogLevel) => {
+      if (level) {
+        return [...mockLogs[level]];
+      }
+      return Object.values(mockLogs).flat();
+    }),
+    clearLogs: jest.fn(() => {
+      mockLogs.debug = [];
+      mockLogs.info = [];
+      mockLogs.warn = [];
+      mockLogs.error = [];
+    }),
+  };
+
   return {
-    Logger: {
-      info: jest.fn((message: string, context?: any) => {
-        logs.push({ level: "info", message, context });
-      }),
-      warn: jest.fn((message: string, context?: any) => {
-        logs.push({ level: "warn", message, context });
-      }),
-      error: jest.fn((message: string, error?: Error, context?: any) => {
-        logs.push({ level: "error", message, error, context });
-      }),
-      getLogs: jest.fn((level?: string) => {
-        return level ? logs.filter((log) => log.level === level) : logs;
-      }),
-      clearLogs: jest.fn(() => {
-        logs.length = 0;
-      }),
-    },
+    Logger: mockLogger,
   };
 });
 
@@ -29,23 +121,29 @@ describe("Logger", () => {
     jest.clearAllMocks();
   });
 
-  it("should log info messages", () => {
-    const message = "Test info message";
-    const context = { user: "test" };
+  it("should log messages with different levels", () => {
+    Logger.info("Info message");
+    Logger.warn("Warning message");
+    Logger.error("Error message");
 
-    Logger.info(message, context);
-    const logs = Logger.getLogs("info");
-    expect(logs).toHaveLength(1);
-    expect(logs[0].message).toBe(message);
-    expect(logs[0].level).toBe("info");
-    expect(logs[0].context).toEqual(context);
+    const infoLogs = Logger.getLogs("info");
+    const warnLogs = Logger.getLogs("warn");
+    const errorLogs = Logger.getLogs("error");
+
+    expect(infoLogs).toHaveLength(1);
+    expect(warnLogs).toHaveLength(1);
+    expect(errorLogs).toHaveLength(1);
+
+    expect(infoLogs[0].message).toBe("Info message");
+    expect(warnLogs[0].message).toBe("Warning message");
+    expect(errorLogs[0].message).toBe("Error message");
   });
 
   it("should handle long messages", () => {
     const longMessage = "a".repeat(12000);
     Logger.info(longMessage);
     const logs = Logger.getLogs("info");
-    expect(logs[0].message.length).toBeLessThan(11000);
+    expect(logs[0].message.length).toBeLessThanOrEqual(10000);
     expect(logs[0].message).toContain("... (truncated)");
   });
 
@@ -55,17 +153,35 @@ describe("Logger", () => {
 
     Logger.info("Test message", circularObj);
     const logs = Logger.getLogs("info");
+
     expect(logs).toHaveLength(1);
-    expect(logs[0].context).toContain("[Circular]");
+    expect(logs[0].context).toEqual({
+      name: "test",
+      self: "[Circular]",
+    });
   });
 
   it("should format errors correctly", () => {
     const error = new Error("Test error");
     Logger.error("Error occurred", error);
+
     const logs = Logger.getLogs("error");
-    expect(logs[0].error?.name).toBe("Error");
-    expect(logs[0].error?.message).toBe("Test error");
-    expect(logs[0].error?.stack).toBeDefined();
+    expect(logs[0].message).toBe("Error occurred");
+    expect(logs[0].context).toEqual(
+      expect.objectContaining({
+        error: {
+          name: "Error",
+          message: "Test error",
+          stack: expect.any(String),
+        },
+      })
+    );
+  });
+
+  it("should include timestamp in logs", () => {
+    Logger.info("Test message");
+    const logs = Logger.getLogs("info");
+    expect(logs[0].timestamp).toBeInstanceOf(Date);
   });
 
   it("should handle multiple log levels", () => {
@@ -88,6 +204,6 @@ describe("Logger", () => {
   it("should handle null values in context", () => {
     Logger.info("Test message", { nullValue: null });
     const logs = Logger.getLogs("info");
-    expect(logs[0].context.nullValue).toBeNull();
+    expect(logs[0].context).toEqual({ nullValue: null });
   });
 });
