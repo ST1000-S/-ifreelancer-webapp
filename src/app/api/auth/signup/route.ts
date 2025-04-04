@@ -3,18 +3,20 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Logger } from "@/lib/logger";
 
+const logger = Logger;
+
 export async function POST(req: Request) {
   try {
     // Log the raw request
-    Logger.debug("Raw request headers", {
+    logger.debug("Raw request headers", {
       headers: Object.fromEntries(req.headers.entries()),
     });
 
     const body = await req.json();
-    Logger.debug("Raw request body", { body });
+    logger.debug("Raw request body", { body });
 
     const { email, password, name, role } = body;
-    Logger.debug("Parsed fields", { email, name, role });
+    logger.debug("Parsed fields", { email, name, role });
 
     // Validate input
     if (!email || !password || !name || !role) {
@@ -24,7 +26,7 @@ export async function POST(req: Request) {
       if (!name) missingFields.push("name");
       if (!role) missingFields.push("role");
 
-      Logger.warn("Missing required fields in signup", {
+      logger.warn("Missing required fields in signup", {
         missingFields: missingFields.join(", "),
         receivedFields: Object.keys(body).join(", "),
         ip: req.headers.get("x-forwarded-for") || "unknown",
@@ -42,7 +44,7 @@ export async function POST(req: Request) {
       });
 
       if (existingUser) {
-        Logger.warn("Signup attempt with existing email", {
+        logger.warn("Signup attempt with existing email", {
           email,
           ip: req.headers.get("x-forwarded-for") || "unknown",
         });
@@ -52,7 +54,7 @@ export async function POST(req: Request) {
         );
       }
     } catch (dbError) {
-      Logger.error("Database error checking existing user", dbError as Error, {
+      logger.error("Database error checking existing user", dbError as Error, {
         email,
         error: (dbError as Error).message,
       });
@@ -64,7 +66,7 @@ export async function POST(req: Request) {
 
     // Create user
     try {
-      Logger.debug("Creating user", { email, name, role });
+      logger.debug("Creating user", { email, name, role });
       const user = await prisma.user.create({
         data: {
           email,
@@ -75,7 +77,7 @@ export async function POST(req: Request) {
       });
 
       // Create empty profile
-      Logger.debug("Creating profile", { userId: user.id });
+      logger.debug("Creating profile", { userId: user.id });
       await prisma.profile.create({
         data: {
           userId: user.id,
@@ -84,7 +86,7 @@ export async function POST(req: Request) {
         },
       });
 
-      Logger.info("New user created successfully", {
+      logger.info("New user created successfully", {
         userId: user.id,
         email: user.email,
         role: user.role,
@@ -92,7 +94,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json({ message: "User created successfully" });
     } catch (dbError) {
-      Logger.error("Database error creating user", dbError as Error, {
+      logger.error("Database error creating user", dbError as Error, {
         email,
         name,
         role,
@@ -102,7 +104,7 @@ export async function POST(req: Request) {
     }
   } catch (error) {
     const err = error as Error;
-    Logger.error("Error during signup", err, {
+    logger.error("Error during signup", err, {
       name: err.name,
       message: err.message,
       stack: err.stack,
