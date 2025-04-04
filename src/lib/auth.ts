@@ -136,11 +136,8 @@ export async function createUser(newUser: NewUser): Promise<User> {
       name: "",
       profile: {
         create: {
-          skills: [],
-          languages: [],
-          portfolio: {
-            create: [],
-          },
+          title: "",
+          bio: "",
         },
       },
     };

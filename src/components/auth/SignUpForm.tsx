@@ -60,7 +60,7 @@ export function SignUpForm() {
     }
 
     try {
-      const response = await fetch("/api/auth/register", {
+      const response = await fetch("/api/auth/signup", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -71,7 +71,7 @@ export function SignUpForm() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || "Something went wrong");
+        throw new Error(data.error || "Something went wrong");
       }
 
       // Login the user after successful registration

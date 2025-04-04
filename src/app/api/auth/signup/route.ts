@@ -6,9 +6,11 @@ import { logger } from "@/lib/logger";
 export async function POST(req: Request) {
   try {
     const { email, password, name, role } = await req.json();
+    console.log("Received signup request:", { email, name, role });
 
     // Validate input
     if (!email || !password || !name || !role) {
+      console.log("Missing required fields:", { email, name, role });
       logger.warn("Missing required fields in signup", {
         missingFields: ["email", "password", "name", "role"].filter(
           (field) => !eval(field)
@@ -27,6 +29,7 @@ export async function POST(req: Request) {
     });
 
     if (existingUser) {
+      console.log("User already exists:", email);
       logger.warn("Signup attempt with existing email", {
         email,
         ip: req.headers.get("x-forwarded-for"),
@@ -41,6 +44,7 @@ export async function POST(req: Request) {
     const hashedPassword = await hash(password, 12);
 
     // Create user
+    console.log("Creating user:", { email, name, role });
     const user = await prisma.user.create({
       data: {
         email,
@@ -51,11 +55,12 @@ export async function POST(req: Request) {
     });
 
     // Create empty profile
+    console.log("Creating profile for user:", user.id);
     await prisma.profile.create({
       data: {
         userId: user.id,
-        skills: [],
-        languages: [],
+        title: "",
+        bio: "",
       },
     });
 
@@ -67,6 +72,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ message: "User created successfully" });
   } catch (error) {
+    console.error("Error during signup:", error);
     logger.error("Error during signup", {
       error: error as Error,
       stack: (error as Error).stack,
