@@ -1,18 +1,20 @@
-import type { NextAuthOptions } from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { prisma } from "./prisma";
-import { logger } from "./logger";
-import bcrypt from "bcryptjs";
-import type { Prisma, UserRole } from "@prisma/client";
+import { type NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
+import { Prisma, UserRole } from "@prisma/client";
+import { prisma } from "./prisma";
+import { Logger } from "./logger";
 import type { Adapter } from "next-auth/adapters";
+
+const logger = Logger.getInstance("auth");
 
 export interface User {
   id: string;
   email: string;
   role: UserRole;
   name: string | null;
-  image: string | null;
+  image?: string | null;
 }
 
 export interface Credentials {
@@ -24,6 +26,7 @@ export interface NewUser {
   email: string;
   password: string;
   role: UserRole;
+  name: string;
 }
 
 declare module "next-auth" {
@@ -105,8 +108,8 @@ export async function authorize(credentials: Credentials): Promise<User> {
 }
 
 export async function createUser(newUser: NewUser): Promise<User> {
-  if (!newUser.email || !newUser.password) {
-    const error = new Error("Email and password are required");
+  if (!newUser.email || !newUser.password || !newUser.name) {
+    const error = new Error("Email, password, and name are required");
     logger.warn(error.message);
     throw error;
   }
@@ -133,7 +136,7 @@ export async function createUser(newUser: NewUser): Promise<User> {
       email: newUser.email,
       password: hashedPassword,
       role: newUser.role,
-      name: "",
+      name: newUser.name,
       profile: {
         create: {
           title: "",
