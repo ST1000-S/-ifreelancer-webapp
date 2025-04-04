@@ -74,6 +74,12 @@ export function SignUpForm() {
         throw new Error(data.error || "Something went wrong");
       }
 
+      // Show success message for signup
+      toast({
+        title: "Account created successfully",
+        description: "Signing you in...",
+      });
+
       // Login the user after successful registration
       const signInResult = await signIn("credentials", {
         email: formData.email,
@@ -87,8 +93,11 @@ export function SignUpForm() {
         );
       }
 
+      // Wait a moment for the session to be established
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       toast({
-        title: "Account created successfully",
+        title: "Welcome!",
         description: "Redirecting to your dashboard...",
       });
 

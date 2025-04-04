@@ -7,7 +7,7 @@ import { prisma } from "./prisma";
 import { Logger } from "./logger";
 import type { Adapter } from "next-auth/adapters";
 
-const logger = Logger.getInstance("auth");
+const logger = Logger;
 
 export interface User {
   id: string;
@@ -187,6 +187,15 @@ export async function createUser(newUser: NewUser): Promise<User> {
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as Adapter,
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+  pages: {
+    signIn: "/auth/signin",
+    signOut: "/auth/signout",
+    error: "/auth/error",
+  },
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -198,7 +207,7 @@ export const authOptions: NextAuthOptions = {
         try {
           if (!credentials?.email || !credentials?.password) {
             logger.warn("Missing credentials");
-            return null;
+            throw new Error("Email and password are required");
           }
 
           const user = await prisma.user.findUnique({
@@ -213,21 +222,18 @@ export const authOptions: NextAuthOptions = {
             },
           });
 
-          if (!user?.email || !user?.password) {
-            logger.warn("User not found or missing required fields", {
-              email: credentials.email,
-            });
-            return null;
+          if (!user || !user.password) {
+            logger.warn("User not found", { email: credentials.email });
+            throw new Error("Invalid email or password");
           }
 
-          const isPasswordValid = await bcrypt.compare(
+          const isValid = await bcrypt.compare(
             credentials.password,
             user.password
           );
-
-          if (!isPasswordValid) {
+          if (!isValid) {
             logger.warn("Invalid password", { email: credentials.email });
-            return null;
+            throw new Error("Invalid email or password");
           }
 
           logger.info("User authenticated successfully", { userId: user.id });
@@ -235,52 +241,39 @@ export const authOptions: NextAuthOptions = {
             id: user.id,
             email: user.email,
             role: user.role,
-            name: user.name ?? "",
-            image: user.image ?? "",
+            name: user.name,
+            image: user.image,
           };
         } catch (error) {
           logger.error("Authentication error", error as Error);
-          return null;
+          throw error;
         }
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
+        // Initial sign in
         token.id = user.id;
-        token.email = user.email;
         token.role = user.role;
+        token.email = user.email;
         token.name = user.name;
-        token.image = user.image;
+      } else if (trigger === "update" && session) {
+        // Handle session updates
+        return { ...token, ...session.user };
       }
       return token;
     },
     async session({ session, token }) {
       if (token) {
-        session.user = {
-          id: token.id as string,
-          email: token.email as string,
-          role: token.role as UserRole,
-          name: token.name as string,
-          image: token.image as string,
-        };
+        session.user.id = token.id;
+        session.user.role = token.role as UserRole;
+        session.user.email = token.email;
+        session.user.name = token.name;
       }
       return session;
     },
-    async redirect({ url, baseUrl }) {
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
-      if (url.startsWith(baseUrl)) return url;
-      return baseUrl;
-    },
   },
-  pages: {
-    signIn: "/auth/signin",
-    error: "/auth/error",
-  },
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-  },
-  secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === "development",
 };

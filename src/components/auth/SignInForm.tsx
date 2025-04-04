@@ -7,7 +7,9 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
-import { logger } from "@/lib/logger";
+import { Logger } from "@/lib/logger";
+
+const logger = Logger;
 
 export function SignInForm() {
   const [isLoading, setIsLoading] = useState(false);
@@ -44,6 +46,8 @@ export function SignInForm() {
         let errorMessage = "Authentication failed";
         if (result.error === "CredentialsSignin") {
           errorMessage = "Invalid email or password";
+        } else if (result.error.includes("Email and password are required")) {
+          errorMessage = "Email and password are required";
         } else {
           errorMessage = result.error;
         }
@@ -54,20 +58,30 @@ export function SignInForm() {
           description: errorMessage,
           variant: "destructive",
         });
-      } else {
-        toast({
-          title: "Login Successful",
-          description: "Redirecting to your dashboard...",
-        });
-        router.push(result.url || callbackUrl);
+        return;
       }
+
+      // Show success message
+      toast({
+        title: "Login Successful",
+        description: "Redirecting to your dashboard...",
+      });
+
+      // Wait a moment for the session to be established
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Redirect to the callback URL or dashboard
+      router.push(result.url || callbackUrl);
     } catch (error) {
       console.error("Sign in error:", error);
       logger.error("Sign in error", error as Error);
-      setError("An unexpected error occurred");
+
+      const errorMessage =
+        error instanceof Error ? error.message : "An unexpected error occurred";
+      setError(errorMessage);
       toast({
         title: "Authentication Failed",
-        description: "An unexpected error occurred",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
