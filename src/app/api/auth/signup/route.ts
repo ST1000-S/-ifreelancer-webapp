@@ -5,6 +5,11 @@ import { Logger } from "@/lib/logger";
 
 export async function POST(req: Request) {
   try {
+    // Log the raw request
+    Logger.debug("Raw request headers", {
+      headers: Object.fromEntries(req.headers.entries()),
+    });
+
     const body = await req.json();
     Logger.debug("Raw request body", { body });
 
@@ -31,52 +36,70 @@ export async function POST(req: Request) {
     }
 
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (existingUser) {
-      Logger.warn("Signup attempt with existing email", {
-        email,
-        ip: req.headers.get("x-forwarded-for") || "unknown",
+    try {
+      const existingUser = await prisma.user.findUnique({
+        where: { email },
       });
-      return NextResponse.json(
-        { error: "User already exists" },
-        { status: 400 }
-      );
+
+      if (existingUser) {
+        Logger.warn("Signup attempt with existing email", {
+          email,
+          ip: req.headers.get("x-forwarded-for") || "unknown",
+        });
+        return NextResponse.json(
+          { error: "User already exists" },
+          { status: 400 }
+        );
+      }
+    } catch (dbError) {
+      Logger.error("Database error checking existing user", dbError as Error, {
+        email,
+        error: (dbError as Error).message,
+      });
+      throw dbError;
     }
 
     // Hash password
     const hashedPassword = await hash(password, 12);
 
     // Create user
-    Logger.debug("Creating user", { email, name, role });
-    const user = await prisma.user.create({
-      data: {
+    try {
+      Logger.debug("Creating user", { email, name, role });
+      const user = await prisma.user.create({
+        data: {
+          email,
+          name,
+          password: hashedPassword,
+          role: role as "FREELANCER" | "CLIENT",
+        },
+      });
+
+      // Create empty profile
+      Logger.debug("Creating profile", { userId: user.id });
+      await prisma.profile.create({
+        data: {
+          userId: user.id,
+          title: "",
+          bio: "",
+        },
+      });
+
+      Logger.info("New user created successfully", {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+      });
+
+      return NextResponse.json({ message: "User created successfully" });
+    } catch (dbError) {
+      Logger.error("Database error creating user", dbError as Error, {
         email,
         name,
-        password: hashedPassword,
-        role: role as "FREELANCER" | "CLIENT",
-      },
-    });
-
-    // Create empty profile
-    Logger.debug("Creating profile", { userId: user.id });
-    await prisma.profile.create({
-      data: {
-        userId: user.id,
-        title: "",
-        bio: "",
-      },
-    });
-
-    Logger.info("New user created successfully", {
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-    });
-
-    return NextResponse.json({ message: "User created successfully" });
+        role,
+        error: (dbError as Error).message,
+      });
+      throw dbError;
+    }
   } catch (error) {
     const err = error as Error;
     Logger.error("Error during signup", err, {
